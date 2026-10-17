@@ -35,10 +35,31 @@ const MATIERES = {
     g.beginPath(); g.moveTo(w / 2, 0); g.lineTo(w, h / 2); g.lineTo(w / 2, h); g.lineTo(0, h / 2); g.closePath(); g.fill();
     g.fillStyle = "#efebe3"; g.beginPath(); g.arc(w / 2, h / 2, w * .22, 0, TAU); g.fill();
     g.fillStyle = "#2f4a6b"; [[0, 0], [w, 0], [0, h], [w, h]].forEach(([x, y]) => { g.beginPath(); g.arc(x, y, w * .16, 0, TAU); g.fill(); }); } },
+  blancMat: { nom: "Blanc mat", couleur: "#eeede9", dessin: (g, w, h) => uni(g, w, h, 40, 3, 93, .015) },
+  sable: { nom: "Beige sable", couleur: "#d9ccb4", dessin: (g, w, h) => uni(g, w, h, 38, 28, 80, .04) },
+  taupe: { nom: "Taupe", couleur: "#8f8174", dessin: (g, w, h) => uni(g, w, h, 30, 12, 52, .04) },
+  noirMat: { nom: "Noir mat", couleur: "#1f1f21", dessin: (g, w, h) => uni(g, w, h, 240, 3, 12, .03) },
+  kaki: { nom: "Vert kaki", couleur: "#6f6e4c", dessin: (g, w, h) => uni(g, w, h, 58, 18, 37, .05) },
+  bleuCiel: { nom: "Bleu ciel", couleur: "#b8d3df", dessin: (g, w, h) => uni(g, w, h, 200, 35, 79, .03) },
+  moutarde: { nom: "Jaune moutarde", couleur: "#c99a3c", dessin: (g, w, h) => uni(g, w, h, 40, 55, 51, .05) },
+  calacatta: { nom: "Marbre veiné or", couleur: "#f0ece4", dessin: (g, w, h) => { uni(g, w, h, 40, 10, 94, .02); veines(g, w, h, "rgba(120,110,100,.4)", 3); veines(g, w, h, "rgba(190,150,80,.5)", 3); } },
+  marbreVert: { nom: "Marbre vert", couleur: "#24463a", dessin: (g, w, h) => { uni(g, w, h, 155, 32, 21, .03); veines(g, w, h, "rgba(220,230,220,.35)", 4); } },
+  zelligeRose: { nom: "Zellige rose", couleur: "#dcaea0", dessin: (g, w, h) => uni(g, w, h, 12, 42, 72 + Math.random() * 10, .08) },
+  zelligeBleu: { nom: "Zellige bleu", couleur: "#2f5d86", dessin: (g, w, h) => uni(g, w, h, 208, 45, 30 + Math.random() * 14, .08) },
+  zelligeNoir: { nom: "Zellige noir", couleur: "#232425", dessin: (g, w, h) => uni(g, w, h, 220, 5, 12 + Math.random() * 8, .08) },
+  terrazzoNoir: { nom: "Terrazzo noir", couleur: "#2b2b2c", dessin: (g, w, h) => { uni(g, w, h, 220, 4, 16, .02);
+    for (let i = 0; i < w * h / 600; i++) { g.fillStyle = ["#f1eee8", "#a39d94", "#c9a98a", "#6f6a64"][i % 4]; g.beginPath(); g.ellipse(Math.random() * w, Math.random() * h, 1.5 + Math.random() * 4, 1.5 + Math.random() * 3, Math.random() * 3, 0, TAU); g.fill(); } } },
+  cimentNoir: { nom: "Ciment noir et blanc", couleur: "#1f1f21", dessin: (g, w, h) => motifCiment(g, w, h, "#efebe3", "#1f1f21") },
+  cimentTerracotta: { nom: "Ciment terracotta", couleur: "#b8684a", dessin: (g, w, h) => motifCiment(g, w, h, "#efe6da", "#b8684a") },
   boisClair: { nom: "Bois clair", couleur: "#d9c3a0", dessin: (g, w, h) => bois(g, w, h, 34, 36, 70) },
   bois: { nom: "Chêne", couleur: "#b58a5c", dessin: (g, w, h) => bois(g, w, h, 30, 45, 50) },
   noyer: { nom: "Noyer", couleur: "#5b4636", dessin: (g, w, h) => bois(g, w, h, 25, 30, 28) }
 };
+function motifCiment(g, w, h, fond, motif) {
+  g.fillStyle = fond; g.fillRect(0, 0, w, h); g.fillStyle = motif;
+  for (let i = 0; i < 4; i++) { g.save(); g.translate(w / 2, h / 2); g.rotate(i * Math.PI / 2); g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(w * .25, -h * .05, w * .5, -h * .5); g.quadraticCurveTo(w * .05, -h * .25, 0, 0); g.fill(); g.restore(); }
+  g.beginPath(); g.arc(w / 2, h / 2, w * .1, 0, TAU); g.fill();
+}
 function uni(g, w, h, teinte, sat, lum, ampl) {
   const l = lum + (Math.random() - .5) * 4;
   g.fillStyle = `hsl(${teinte},${sat}%,${l}%)`; g.fillRect(0, 0, w, h);
@@ -58,6 +79,10 @@ const FORMATS = {
   "5x5": { nom: "Mosaïque 5×5", t: [.05, .05] },
   "7.5x15": { nom: "Métro 7,5×15", t: [.15, .075], decale: true },
   "10x10": { nom: "Zellige 10×10", t: [.1, .1] },
+  "15x15": { nom: "15×15", t: [.15, .15] },
+  "7.5x30v": { nom: "Baguette verticale 7,5×30", t: [.075, .3] },
+  "7.5x30": { nom: "Métro long 7,5×30", t: [.3, .075], decale: true },
+  "45x90": { nom: "45×90", t: [.9, .45] },
   "20x20": { nom: "20×20", t: [.2, .2] },
   "30x30": { nom: "30×30", t: [.3, .3] },
   "30x60": { nom: "30×60", t: [.6, .3] },
@@ -109,9 +134,19 @@ function materiauCarrelage(rev, largeur, hauteur, sol = false) {
   const base = textureCarrelage(rev.matiere, rev.format, rev.joint);
   const t = base.clone(); t.needsUpdate = true;
   t.repeat.set(largeur / base.userData.motif[0], hauteur / base.userData.motif[1]);
-  const brillant = ["blanc", "marbre", "marbreNoir", "bleu", "bleuNuit", "creme", "zelligeBlanc", "zelligeVert", "rose"].includes(rev.matiere);
+  const brillant = ["blanc", "marbre", "marbreNoir", "calacatta", "marbreVert", "bleu", "bleuNuit", "bleuCiel", "creme", "zelligeBlanc", "zelligeVert", "zelligeRose", "zelligeBleu", "zelligeNoir", "rose"].includes(rev.matiere);
   return new THREE.MeshStandardMaterial({ map: t, bumpMap: t, bumpScale: sol ? 1.2 : .9, roughness: sol ? .5 : (brillant ? .14 : .42), envMapIntensity: brillant ? .45 : .2 });
 }
+const ROBINETTERIE = {
+  noir: { nom: "Noir mat", couleur: "#1d1d1f", c: 0x1d1d1f, m: .3, r: .5 },
+  chrome: { nom: "Chrome", couleur: "#d4d7da", c: 0xd4d7da, m: .95, r: .1 },
+  inox: { nom: "Inox brossé", couleur: "#b9bcbf", c: 0xb9bcbf, m: .9, r: .35 },
+  dore: { nom: "Doré brossé", couleur: "#c9a35a", c: 0xc9a35a, m: .95, r: .3 },
+  cuivre: { nom: "Cuivre rosé", couleur: "#b87352", c: 0xb87352, m: .95, r: .3 },
+  gun: { nom: "Gris métal", couleur: "#4a4d52", c: 0x4a4d52, m: .9, r: .3 },
+  blanc: { nom: "Blanc mat", couleur: "#f2f2f0", c: 0xf2f2f0, m: .1, r: .5 }
+};
+function appliquerRobinetterie(cle) { const r = ROBINETTERIE[cle] || ROBINETTERIE.noir; MAT.robinet.color.setHex(r.c); MAT.robinet.metalness = r.m; MAT.robinet.roughness = r.r; MAT.robinet.envMapIntensity = r.m > .5 ? 1 : .3; }
 const PEINTURES = { "#f3f1ec": "Blanc cassé", "#e6ddd0": "Lin", "#cfd6cf": "Vert d'eau", "#c9d3db": "Bleu brume", "#d9c3b5": "Rose poudré", "#e9d8b0": "Jaune paille", "#8a8f93": "Gris orage", "#4a5a52": "Vert forêt", "#2c3440": "Bleu nuit" };
 
 /* =================== Matériaux des objets =================== */
@@ -120,6 +155,7 @@ const MAT = {
   ceramique: new THREE.MeshStandardMaterial({ color: 0xfbfbfa, roughness: .12 }),
   noir: new THREE.MeshStandardMaterial({ color: 0x1d1d1f, roughness: .45, metalness: .3 }),
   chrome: new THREE.MeshStandardMaterial({ color: 0xc9cccf, roughness: .15, metalness: .9 }),
+  robinet: new THREE.MeshStandardMaterial({ color: 0x1d1d1f, roughness: .45, metalness: .3 }),
   verre: new THREE.MeshPhysicalMaterial({ color: 0xdfeff0, roughness: .05, transmission: .9, transparent: true, opacity: .3 }),
   vitre: new THREE.MeshStandardMaterial({ color: 0xbfe0f0, emissive: 0xa6d4ec, emissiveIntensity: .6, transparent: true, opacity: .75 }),
   miroir: new THREE.MeshStandardMaterial({ color: 0xd7dfe2, roughness: .08, metalness: .15, emissive: 0x2a3033, emissiveIntensity: .25 }),
@@ -134,7 +170,7 @@ const MAT = {
   lingeFace: new THREE.MeshStandardMaterial({ color: 0x404448, roughness: .2, metalness: .5 }),
   fond: new THREE.MeshStandardMaterial({ color: 0xe6ecef, roughness: .15 })
 };
-const BOIS = { "#a97c52": "Chêne", "#d9c3a0": "Bois clair", "#5b4636": "Noyer", "#f2f0ec": "Blanc", "#55606a": "Gris bleu", "#7b8a74": "Vert sauge", "#1f1f21": "Noir" };
+const BOIS = { "#a97c52": "Chêne", "#d9c3a0": "Bois clair", "#7a5634": "Chêne foncé", "#5b4636": "Noyer", "#f2f0ec": "Blanc", "#c9c6c0": "Gris clair", "#d8cbb6": "Beige", "#55606a": "Gris bleu", "#2c3a4f": "Bleu nuit", "#7b8a74": "Vert sauge", "#3f5446": "Vert forêt", "#77744f": "Kaki", "#d9b7ab": "Rose", "#b5654a": "Terracotta", "#1f1f21": "Noir" };
 const matBois = c => new THREE.MeshStandardMaterial({ color: new THREE.Color(c), roughness: .55 });
 const boite = (w, h, d, m) => { const x = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); x.castShadow = x.receiveShadow = true; return x; };
 const cyl = (r, h, m, s = 16) => { const x = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, s), m); x.castShadow = true; return x; };
@@ -157,17 +193,17 @@ const CAT = {
       g.add(pose(boite(w * .6, .005, .05, MAT.chrome), 0, .033, -d / 2 + .1));
       g.add(pose(new THREE.Mesh(new THREE.BoxGeometry(.01, h, d), MAT.verre), w / 2, h / 2, 0));
       g.add(pose(boite(.02, .02, d, MAT.noir), w / 2, h, 0));
-      g.add(pose(cyl(.012, 1.1, MAT.noir), -w * .1, 1.45, -d / 2 + .03));
-      const bras = cyl(.01, .3, MAT.noir); bras.rotation.x = Math.PI / 2; g.add(pose(bras, -w * .1, 2, -d / 2 + .16));
-      g.add(pose(boite(.25, .012, .25, MAT.noir), -w * .1, 1.99, -d / 2 + .28));
-      g.add(pose(boite(.18, .06, .05, MAT.noir), -w * .1, 1.05, -d / 2 + .03));
+      g.add(pose(cyl(.012, 1.1, MAT.robinet), -w * .1, 1.45, -d / 2 + .03));
+      const bras = cyl(.01, .3, MAT.robinet); bras.rotation.x = Math.PI / 2; g.add(pose(bras, -w * .1, 2, -d / 2 + .16));
+      g.add(pose(boite(.25, .012, .25, MAT.robinet), -w * .1, 1.99, -d / 2 + .28));
+      g.add(pose(boite(.18, .06, .05, MAT.robinet), -w * .1, 1.05, -d / 2 + .03));
       return g; } },
   baignoire: { nom: "Baignoire", groupe: "Sanitaires", pose: "mur", dims: [170, 75, 55], tailles: [[160, 70], [170, 70], [170, 75], [180, 80]],
     faire(w, d, h) {
       const g = new THREE.Group();
       g.add(pose(boite(w, h, d, MAT.ceramique), 0, h / 2, 0));
       g.add(pose(new THREE.Mesh(new THREE.BoxGeometry(w - .14, .02, d - .14), MAT.fond), 0, h + .001, 0));
-      g.add(pose(boite(.05, .12, .05, MAT.chrome), -w / 2 + .1, h + .06, -d / 2 + .05));
+      g.add(pose(boite(.05, .12, .05, MAT.robinet), -w / 2 + .1, h + .06, -d / 2 + .05));
       return g; } },
   ilot: { nom: "Baignoire îlot", groupe: "Sanitaires", pose: "sol", dims: [170, 80, 60], tailles: [[160, 75], [170, 80], [180, 85]],
     faire(w, d, h) {
@@ -176,10 +212,10 @@ const CAT = {
       corps.rotation.z = Math.PI / 2; corps.scale.set(h / d, 1, 1); corps.position.y = h / 2; corps.castShadow = true; g.add(corps);
       const fond = new THREE.Mesh(new THREE.CapsuleGeometry(d / 2 - .06, Math.max(.01, w - d), 8, 24), MAT.fond);
       fond.rotation.z = Math.PI / 2; fond.scale.set(.04, 1, 1); fond.position.y = h - .005; g.add(fond);
-      g.add(pose(cyl(.015, 1, MAT.noir), w / 2 + .12, .5, 0));
+      g.add(pose(cyl(.015, 1, MAT.robinet), w / 2 + .12, .5, 0));
       return g; } },
   laveMains: { nom: "Lave-mains", groupe: "Sanitaires", pose: "mur", dims: [40, 25, 15], tailles: [[35, 22], [40, 25], [45, 25]],
-    faire(w, d) { const g = new THREE.Group(); g.add(pose(boite(w, .12, d, MAT.ceramique), 0, .8, 0)); g.add(pose(cyl(.01, .15, MAT.chrome), 0, .92, -d / 2 + .04)); return g; } },
+    faire(w, d) { const g = new THREE.Group(); g.add(pose(boite(w, .12, d, MAT.ceramique), 0, .8, 0)); g.add(pose(cyl(.01, .15, MAT.robinet), 0, .92, -d / 2 + .04)); return g; } },
   wc: { nom: "WC suspendu", groupe: "Sanitaires", pose: "mur", dims: [37, 55, 40],
     faire(w, d) {
       const g = new THREE.Group();
@@ -205,11 +241,11 @@ const CAT = {
       g.add(pose(boite(w, .04, d, matBois(o.finition || "#a97c52")), 0, .86, 0));
       g.add(pose(cyl(.19, .14, MAT.noir, 32), 0, .95, .02));
       g.add(pose(cyl(.16, .02, MAT.receveurNoir, 32), 0, 1.015, .02));
-      g.add(pose(cyl(.012, .3, MAT.noir), 0, 1.03, -d / 2 + .04));
+      g.add(pose(cyl(.012, .3, MAT.robinet), 0, 1.03, -d / 2 + .04));
       return g; } },
   colonne: { nom: "Colonne de rangement", groupe: "Meubles", pose: "mur", dims: [40, 33, 170], tailles: [[30, 30], [40, 33], [50, 35]], options: { finition: Object.keys(BOIS) },
     faire(w, d, h, o) { const g = new THREE.Group(); g.add(pose(boite(w, h, d, matBois(o.finition || "#a97c52")), 0, h / 2 + .15, 0));
-      g.add(pose(boite(.015, .2, .01, MAT.noir), w / 2 - .05, h / 2 + .15, d / 2 + .005)); return g; } },
+      g.add(pose(boite(.015, .2, .01, MAT.robinet), w / 2 - .05, h / 2 + .15, d / 2 + .005)); return g; } },
   armoire: { nom: "Armoire de toilette", groupe: "Meubles", pose: "mur", dims: [80, 15, 70], tailles: [[60, 15], [80, 15], [100, 15], [120, 15]], hauteur: 115,
     faire(w, d, h) { const g = new THREE.Group(); g.add(pose(boite(w, h, d, MAT.blanc), 0, h / 2, 0));
       g.add(pose(new THREE.Mesh(new THREE.PlaneGeometry(w - .02, h - .02), MAT.miroir), 0, h / 2, d / 2 + .002)); g.add(pose(boite(w, .02, d, MAT.led), 0, -.01, 0)); return g; } },
@@ -238,8 +274,8 @@ const CAT = {
       g.add(pose(new THREE.PointLight(0xfff1d6, .5, 1.5), 0, r, .2)); return g; } },
   miroirRect: { nom: "Miroir rectangulaire", groupe: "Équipements", pose: "mur", dims: [100, 3, 70], tailles: [[80, 3], [100, 3], [120, 3], [140, 3]], hauteur: 115,
     faire(w, d, h) { const g = new THREE.Group(); g.add(pose(new THREE.Mesh(new THREE.PlaneGeometry(w, h), MAT.miroir), 0, h / 2, .005)); g.add(pose(boite(w, .015, .02, MAT.led), 0, h + .01, 0)); return g; } },
-  porte: { nom: "Porte", groupe: "Ouvertures", pose: "dansMur", dims: [83, 4, 204], tailles: [[73, 4], [83, 4], [93, 4]], options: { type: ["Battante", "Coulissante"] },
-    faire(w, d, h, o) { const g = new THREE.Group(), cadre = MAT.blanc, coul = o.type === "Coulissante";
+  porte: { nom: "Porte", groupe: "Ouvertures", pose: "dansMur", dims: [83, 4, 204], tailles: [[73, 4], [83, 4], [93, 4]], options: { ouverture: ["Battante", "Coulissante"] },
+    faire(w, d, h, o) { const g = new THREE.Group(), cadre = MAT.blanc, coul = o.ouverture === "Coulissante";
       g.add(pose(boite(.05, h + .05, .04, cadre), -w / 2 - .025, (h + .05) / 2, .01)); g.add(pose(boite(.05, h + .05, .04, cadre), w / 2 + .025, (h + .05) / 2, .01));
       g.add(pose(boite(w + .1, .05, .04, cadre), 0, h + .025, .01));
       g.add(pose(boite(w - .01, h - .01, .035, new THREE.MeshStandardMaterial({ color: 0xeeebe5, roughness: .5 })), coul ? w * .25 : 0, h / 2, coul ? .05 : .015));
@@ -283,10 +319,10 @@ function meuble(w, d, h, n, o) {
   for (let i = 0; i < n; i++) {
     const x = n === 1 ? 0 : (i ? w / 4 : -w / 4);
     g.add(pose(new THREE.Mesh(new THREE.CylinderGeometry(.16, .13, .005, 32), MAT.fond), x, haut + .003, .02));
-    g.add(pose(cyl(.012, .22, MAT.noir), x, haut + .11, -d / 2 + .05));
-    const bec = cyl(.008, .12, MAT.noir); bec.rotation.x = Math.PI / 2; g.add(pose(bec, x, haut + .2, -d / 2 + .1));
+    g.add(pose(cyl(.012, .22, MAT.robinet), x, haut + .11, -d / 2 + .05));
+    const bec = cyl(.008, .12, MAT.robinet); bec.rotation.x = Math.PI / 2; g.add(pose(bec, x, haut + .2, -d / 2 + .1));
   }
-  [-.1, .08].forEach(y => g.add(pose(boite(w * .3, .015, .01, MAT.noir), 0, haut - h / 2 + y, d / 2 + .006)));
+  [-.1, .08].forEach(y => g.add(pose(boite(w * .3, .015, .01, MAT.robinet), 0, haut - h / 2 + y, d / 2 + .006)));
   return g;
 }
 const GROUPES = ["Sanitaires", "Meubles", "Équipements", "Ouvertures", "Réseaux"];
@@ -329,6 +365,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     ]
   });
   let etat = defaut(), simId = null, client = null, selection = null, chantier = false;
+  etat.robinetterie = "noir";
   if (params.get("sim")) {
     const s = await db.lire("simulations", params.get("sim"));
     if (s) { etat = migrer({ ...defaut(), ...s.data }); simId = s.id; etat.nom = s.nom || etat.nom; if (s.client_id) client = await db.lire("clients", s.client_id); }
@@ -338,6 +375,8 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
   function migrer(e) { // simulations enregistrées avant la refonte
     ["murs", "sol"].forEach(k => { if (typeof e[k] === "string") e[k] = { matiere: MATIERES[e[k]] ? e[k] : "blanc", format: k === "sol" ? "60x60" : "60x120", joint: "gris" }; });
     if (typeof e.accent === "string") e.accent = { matiere: MATIERES[e.accent] ? e.accent : "bleu", format: "7.5x15", joint: "blanc", actif: true };
+    (e.objets || []).forEach(o => { if (o.type === "Battante" || o.type === "Coulissante") { o.ouverture = o.type; o.type = "porte"; } });
+    if (!e.robinetterie) e.robinetterie = "noir";
     return e;
   }
   function completer(o) {
@@ -362,6 +401,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
           <button class="btn clair" id="devisSim">Créer le devis</button>
           <button class="btn clair" id="imageSim">Image</button>
           <button class="btn clair" id="videoSim">Vidéo</button>
+          <button class="btn discret" id="gptSim">Préparer pour ChatGPT</button>
           <button class="btn discret" id="vueDessus">Vue de dessus</button>
           <button class="btn discret" id="modeChantier">Mode chantier</button>
         </div>
@@ -390,6 +430,10 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
             <div class="champ"><label>Joints</label><select data-joint="${k}">${opts({ blanc: "Blancs", gris: "Gris", noir: "Noirs" }, etat[k].joint)}</select></div>
           </div>
         </fieldset>`).join("")}
+        <fieldset><legend>Robinetterie et poignées</legend>
+          <div class="palette">${Object.entries(ROBINETTERIE).map(([k, r]) => `<button type="button" class="pastille ${k === etat.robinetterie ? "actif" : ""}" data-robinet="${k}" title="${r.nom}" aria-label="${r.nom}" style="background:${r.couleur}"></button>`).join("")}</div>
+          <p class="gris" style="font-size:13px;margin-top:6px" id="nomRobinet">${esc(ROBINETTERIE[etat.robinetterie]?.nom || "")}</p>
+        </fieldset>
         <fieldset><legend>Ajouter</legend>
           ${GROUPES.map(gp => `<div class="cat-titre">${gp}</div><div class="objets">${Object.entries(CAT).filter(([, c]) => c.groupe === gp).map(([k, c]) => `<button type="button" data-ajout="${k}">${esc(c.nom)}</button>`).join("")}</div>`).join("")}
         </fieldset>
@@ -501,7 +545,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     if (tournage) tournage.image();
     requestAnimationFrame(boucle);
   }
-  reconstruire(); boucle();
+  appliquerRobinetterie(etat.robinetterie); reconstruire(); boucle();
 
   /* --- Métré --- */
   function metre() {
@@ -550,7 +594,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     glisse = false; controles.enabled = true;
   });
 
-  const LIBELLES = { receveur: "Receveur", diametre: "Diamètre", type: "Type" };
+  const LIBELLES = { receveur: "Receveur", diametre: "Diamètre", ouverture: "Ouverture" };
   function afficherSelection() {
     const p = document.getElementById("selPanneau");
     if (selection === null || !etat.objets[selection]) { selection = null; p.hidden = true; return; }
@@ -610,6 +654,11 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
       if (k === "sol" && ["bois", "boisClair", "noyer"].includes(b.dataset[cle])) etat.sol.format = "parquet";
       panneau.querySelector(`[data-nommat="${k}"]`).textContent = MATIERES[b.dataset[cle]].nom;
     } else if (b.dataset.peinture) etat.peinture = b.dataset.peinture;
+    else if (b.dataset.robinet) {
+      etat.robinetterie = b.dataset.robinet; appliquerRobinetterie(etat.robinetterie);
+      panneau.querySelectorAll("[data-robinet]").forEach(x => x.classList.toggle("actif", x === b));
+      document.getElementById("nomRobinet").textContent = ROBINETTERIE[etat.robinetterie].nom; return;
+    }
     else if (b.dataset.ajout) {
       const t = b.dataset.ajout, o = { type: t, x: 0, z: 0, rot: 0 }; completer(o);
       if (CAT[t].pose === "mur" || CAT[t].pose === "dansMur") o.z = -etat.dims.p / 2;
@@ -683,6 +732,58 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     if (navigator.canShare && navigator.canShare({ files: [fichier] })) { try { await navigator.share({ files: [fichier], title: "Simulation KA Rénovation" }); return; } catch (er) { if (er.name === "AbortError") return; } }
     const a = document.createElement("a"); a.href = URL.createObjectURL(fichier); a.download = fichier.name; a.click();
     toast("Vidéo enregistrée ✓");
+  };
+  /* --- ChatGPT (en option, avec le compte de l'artisan) : on prépare le texte et l'image, il colle et envoie --- */
+  const metres = v => String(Math.round(v * 100) / 100).replace(".", ",") + " m";
+  const revetement = r => `${MATIERES[r.matiere].nom.toLowerCase()}, format ${FORMATS[r.format].nom}, joints ${({ blanc: "blancs", gris: "gris", noir: "noirs" })[r.joint]}`;
+  function descriptionChatGPT(source) {
+    const { l, p, h } = etat.dims;
+    const equipements = etat.objets.filter(o => CAT[o.type].groupe !== "Réseaux").map(o => {
+      const c = CAT[o.type], w = o.w ?? c.dims[0] / 100, d = o.d ?? c.dims[1] / 100;
+      const opts = Object.keys(c.options || {}).map(k => k === "finition" ? (BOIS[o[k]] || "").toLowerCase() : o[k] ? (k === "receveur" ? "receveur " : "") + o[k].toLowerCase() : "").filter(Boolean);
+      const taille = c.tailles && ["Sanitaires", "Meubles"].includes(c.groupe) ? ` (${Math.round(w * 100)} × ${Math.round(d * 100)} cm)` : "";
+      return `- ${c.nom}${taille}${opts.length ? ", " + opts.join(", ") : ""}`;
+    });
+    const faience = { plafond: "jusqu'au plafond", "120": "à 1,20 m de haut (jusqu'au plafond dans la douche)", douche: "seulement dans la douche" }[etat.faience];
+    const debut = source === "photo"
+      ? "Voici la photo de la salle de bain actuelle de mon client. Montre-moi cette même pièce rénovée, en photo réaliste, avec le même point de vue : garde les murs, la fenêtre, la porte et les proportions de la photo."
+      : "Voici une vue 3D de la salle de bain que nous allons réaliser. Transforme-la en photo réaliste, comme prise par un photographe d'intérieur, en gardant exactement la disposition, les proportions et l'emplacement de chaque élément.";
+    return [debut, "",
+      `Pièce : ${metres(l)} × ${metres(p)}, hauteur ${metres(h)}.`,
+      `Carrelage mural ${faience} : ${revetement(etat.murs)}.`,
+      etat.accent.actif ? `Mur de la douche : ${revetement(etat.accent)}.` : "",
+      `Sol : ${revetement(etat.sol)}.`,
+      etat.faience !== "plafond" ? `Peinture au-dessus du carrelage : ${(PEINTURES[etat.peinture] || "").toLowerCase()}.` : "",
+      `Robinetterie et poignées : ${(ROBINETTERIE[etat.robinetterie]?.nom || "").toLowerCase()}.`,
+      "", "Équipements :", ...equipements, "",
+      "Lumière naturelle douce, rendu haut de gamme, sans texte, sans logo et sans personne."].filter((x, i, t) => x !== "" || (t[i - 1] !== "" && i > 0)).join("\n");
+  }
+  document.getElementById("gptSim").onclick = () => {
+    const v = document.createElement("div"); v.className = "voile";
+    v.innerHTML = `<div class="fenetre" role="dialog" aria-modal="true"><div class="tete"><h2>Préparer pour ChatGPT</h2><button class="icone" data-fermer aria-label="Fermer">✕</button></div>
+      <p class="gris" style="font-size:14px;margin-bottom:12px">Avec le compte ChatGPT de l'artisan : copiez le texte, ouvrez ChatGPT, collez-le et joignez l'image. Le résultat est une image d'illustration : les dimensions et les détails ne sont pas exacts.</p>
+      <div class="champ"><label>À partir de</label><select id="gptSource"><option value="3d">L'image de la simulation 3D</option><option value="photo">La photo de la pièce du client</option></select></div>
+      <textarea id="gptTexte" rows="12" style="font-size:13px;margin:8px 0 12px"></textarea>
+      <div class="actions-doc" style="margin:0">
+        <button class="btn" id="gptCopier">1. Copier le texte</button>
+        <button class="btn clair" id="gptImage">2. Enregistrer l'image 3D</button>
+        <a class="btn clair" href="https://chatgpt.com/" target="_blank" rel="noopener">3. Ouvrir ChatGPT</a>
+      </div></div>`;
+    document.body.appendChild(v);
+    const texte = v.querySelector("#gptTexte"), source = v.querySelector("#gptSource"), btnImage = v.querySelector("#gptImage");
+    const remplir = () => { texte.value = descriptionChatGPT(source.value); btnImage.hidden = source.value === "photo"; };
+    remplir(); source.onchange = remplir;
+    v.addEventListener("click", e => { if (e.target === v || e.target.closest("[data-fermer]")) v.remove(); });
+    v.querySelector("#gptCopier").onclick = async () => {
+      try { await navigator.clipboard.writeText(texte.value); } catch { texte.select(); document.execCommand("copy"); }
+      toast("Texte copié ✓ : collez-le dans ChatGPT");
+    };
+    btnImage.onclick = async () => {
+      const blob = await (await fetch(image(1600))).blob();
+      const fichier = new File([blob], `simulation-${(client?.nom || "salle-de-bain").toLowerCase()}.jpg`, { type: "image/jpeg" });
+      if (navigator.canShare && navigator.canShare({ files: [fichier] })) { try { await navigator.share({ files: [fichier] }); return; } catch (er) { if (er.name === "AbortError") return; } }
+      const a = document.createElement("a"); a.href = URL.createObjectURL(fichier); a.download = fichier.name; a.click();
+    };
   };
   document.getElementById("clientSim").onclick = () => choisirClient(c => { client = c; document.getElementById("clientSim").textContent = nomClient(c); });
   document.getElementById("titreSim").onclick = () => { const n = prompt("Nom de la simulation", etat.nom); if (n) { etat.nom = n; document.getElementById("titreSim").textContent = n; } };
