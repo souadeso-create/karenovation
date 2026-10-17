@@ -2,6 +2,7 @@
 // réseaux (eau, évacuations, électricité), métré et création du devis.
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 
 const TAU = Math.PI * 2;
 const cm = v => Math.round(v * 100);
@@ -109,7 +110,7 @@ function materiauCarrelage(rev, largeur, hauteur, sol = false) {
   const t = base.clone(); t.needsUpdate = true;
   t.repeat.set(largeur / base.userData.motif[0], hauteur / base.userData.motif[1]);
   const brillant = ["blanc", "marbre", "marbreNoir", "bleu", "bleuNuit", "creme", "zelligeBlanc", "zelligeVert", "rose"].includes(rev.matiere);
-  return new THREE.MeshStandardMaterial({ map: t, roughness: sol ? .55 : (brillant ? .22 : .5) });
+  return new THREE.MeshStandardMaterial({ map: t, bumpMap: t, bumpScale: sol ? 1.2 : .9, roughness: sol ? .5 : (brillant ? .14 : .42), envMapIntensity: brillant ? .45 : .2 });
 }
 const PEINTURES = { "#f3f1ec": "Blanc cassé", "#e6ddd0": "Lin", "#cfd6cf": "Vert d'eau", "#c9d3db": "Bleu brume", "#d9c3b5": "Rose poudré", "#e9d8b0": "Jaune paille", "#8a8f93": "Gris orage", "#4a5a52": "Vert forêt", "#2c3440": "Bleu nuit" };
 
@@ -354,12 +355,13 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
       <button class="btn clair" id="clientSim">${client ? esc(nomClient(client)) : "Associer un client"}</button></div>
     <div class="deux-col">
       <div>
-        <div class="sim" id="scene"><div class="aide3d">Glissez pour tourner · pincez pour zoomer · touchez un élément pour le déplacer</div></div>
+        <div class="sim" id="scene"><div class="aide3d">Glissez pour tourner · pincez pour zoomer · touchez un élément pour le déplacer</div><div class="tournage" id="tournage" hidden>Vidéo en cours… <b id="tournageS">10</b> s</div></div>
         <div class="carte" id="selPanneau" hidden style="margin-top:12px"></div>
         <div class="actions-doc">
           <button class="btn" id="enregSim">Enregistrer</button>
           <button class="btn clair" id="devisSim">Créer le devis</button>
           <button class="btn clair" id="imageSim">Image</button>
+          <button class="btn clair" id="videoSim">Vidéo</button>
           <button class="btn discret" id="vueDessus">Vue de dessus</button>
           <button class="btn discret" id="modeChantier">Mode chantier</button>
         </div>
@@ -398,17 +400,21 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
   const hote = document.getElementById("scene");
   const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-  renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
+  renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = .9;
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   hote.appendChild(renderer.domElement);
   const scene = new THREE.Scene(); scene.background = new THREE.Color(0xe9e4dc);
   const camera = new THREE.PerspectiveCamera(50, 1, .05, 60); camera.position.set(2.6, 2.3, 3.2);
   const controles = new OrbitControls(camera, renderer.domElement);
   controles.target.set(0, .9, 0); controles.enableDamping = true; controles.maxPolarAngle = Math.PI / 2 - .03; controles.minDistance = 1; controles.maxDistance = 12;
-  scene.add(new THREE.HemisphereLight(0xffffff, 0xd8cfc2, 1.35));
-  const soleil = new THREE.DirectionalLight(0xffffff, 1.5); soleil.position.set(2, 5, 3); soleil.castShadow = true;
-  soleil.shadow.mapSize.set(1024, 1024); Object.assign(soleil.shadow.camera, { left: -5, right: 5, top: 5, bottom: -5 }); scene.add(soleil);
-  const plafonnier = new THREE.PointLight(0xfff3e0, 1, 9); scene.add(plafonnier);
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(renderer), .04).texture; pmrem.dispose();
+  scene.add(new THREE.HemisphereLight(0xfffaf2, 0xcfc4b4, .55));
+  const soleil = new THREE.DirectionalLight(0xfff6ea, 1.7); soleil.position.set(2.2, 5, 3.2); soleil.castShadow = true;
+  const fin = Math.min(innerWidth, innerHeight) > 600 ? 2048 : 1024;
+  soleil.shadow.mapSize.set(fin, fin); soleil.shadow.bias = -.0004; soleil.shadow.normalBias = .02; soleil.shadow.radius = 4;
+  Object.assign(soleil.shadow.camera, { left: -5, right: 5, top: 5, bottom: -5 }); scene.add(soleil);
+  const plafonnier = new THREE.PointLight(0xfff0d8, 1.2, 9, 1.6); scene.add(plafonnier);
   const piece = new THREE.Group(), meubles = new THREE.Group(); scene.add(piece, meubles);
   let murs = []; const objetsMesh = new Map();
 
@@ -443,11 +449,12 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
       piece.add(g); murs.push(g);
     });
     plafonnier.position.set(0, h - .1, 0);
-    majMetre();
+    majMetre(); doser();
   }
   function construireObjets() {
     meubles.clear(); objetsMesh.clear();
     etat.objets.forEach((o, i) => { const g = CAT[o.type].faire(o.w, o.d, o.h, o); g.userData.index = i; meubles.add(g); objetsMesh.set(i, g); placer(i); });
+    doser();
   }
   function encombrement(o) { const t = Math.round(norm(o.rot) / (Math.PI / 2)) % 2 === 1; return [(t ? o.d : o.w) / 2, (t ? o.w : o.d) / 2]; }
   function collerAuMur(o) {
@@ -469,19 +476,30 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     g.rotation.y = o.rot;
     g.userData.mur = c.pose === "dansMur" ? murDe(o.rot) : -1;
   }
-  function reconstruire() { construirePiece(); construireObjets(); afficherSelection(); }
+  // reflets dosés : forts sur le métal et le verre, discrets ailleurs
+  function doser() { scene.traverse(m => { const mt = m.material; if (!mt || mt.userData.dose) return; mt.userData.dose = true;
+    if (mt.envMapIntensity === 1) mt.envMapIntensity = mt.metalness > .5 ? .9 : mt.roughness < .2 ? .5 : .25; }); }
+  function reconstruire() { construirePiece(); construireObjets(); afficherSelection(); doser(); }
 
   /* --- Rendu --- */
   const redim = () => { const r = hote.getBoundingClientRect(); if (!r.width) return; renderer.setSize(r.width, r.height, false); camera.aspect = r.width / r.height; camera.updateProjectionMatrix(); };
   new ResizeObserver(redim).observe(hote); redim();
   const dir = new THREE.Vector3();
+  let tournage = null;
   function boucle() {
     if (!document.body.contains(hote)) { renderer.dispose(); return; }
-    controles.update();
+    if (tournage) {
+      const t = Math.min(1, (performance.now() - tournage.debut) / tournage.duree);
+      const a = tournage.angle + TAU * t;
+      camera.position.set(controles.target.x + Math.sin(a) * tournage.rayon, tournage.hauteur, controles.target.z + Math.cos(a) * tournage.rayon);
+      camera.lookAt(controles.target);
+    } else controles.update();
     const vis = murs.map(m => { dir.copy(camera.position).sub(m.userData.centre); return chantier || dir.dot(m.userData.normale) > 0; });
     murs.forEach((m, i) => { m.visible = vis[i]; });
     meubles.children.forEach(g => { if (g.userData.mur >= 0) g.visible = vis[g.userData.mur]; });
-    renderer.render(scene, camera); requestAnimationFrame(boucle);
+    renderer.render(scene, camera);
+    if (tournage) tournage.image();
+    requestAnimationFrame(boucle);
   }
   reconstruire(); boucle();
 
@@ -629,6 +647,43 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     return c.toDataURL("image/jpeg", .85);
   };
   document.getElementById("imageSim").onclick = () => { const a = document.createElement("a"); a.href = image(); a.download = `simulation-${(client?.nom || "salle-de-bain").toLowerCase()}.jpg`; a.click(); };
+  const logo = new Image(); logo.src = "../medias/logo.png";
+  document.getElementById("videoSim").onclick = async e => {
+    if (tournage) return;
+    const formats = ["video/mp4;codecs=avc1", "video/mp4", "video/webm;codecs=vp9", "video/webm"];
+    const type = window.MediaRecorder && formats.find(f => MediaRecorder.isTypeSupported(f));
+    if (!type) { toast("Ce téléphone ne sait pas enregistrer de vidéo ici : utilisez le bouton Image."); return; }
+    const L = 720, H = 1280, sortie = document.createElement("canvas"); sortie.width = L; sortie.height = H;
+    const g = sortie.getContext("2d");
+    const rapport = renderer.getPixelRatio(), taille = new THREE.Vector2(); renderer.getSize(taille);
+    renderer.setPixelRatio(1); renderer.setSize(L, H, false); camera.aspect = L / H; camera.updateProjectionMatrix();
+    const flux = sortie.captureStream(30), rec = new MediaRecorder(flux, { mimeType: type, videoBitsPerSecond: 6e6 }), morceaux = [];
+    rec.ondataavailable = ev => ev.data.size && morceaux.push(ev.data);
+    const d = new THREE.Vector3().subVectors(camera.position, controles.target);
+    const diag = Math.hypot(etat.dims.l, etat.dims.p), rayon = Math.max(Math.hypot(d.x, d.z), diag * 1.45 + 1.2), duree = 10000;
+    const bouton = e.target, compteur = document.getElementById("tournageS"), bandeau = document.getElementById("tournage");
+    bouton.disabled = true; bandeau.hidden = false; controles.enabled = false;
+    tournage = {
+      debut: performance.now(), duree, rayon, hauteur: etat.dims.h + .9, angle: Math.atan2(d.x, d.z),
+      image() {
+        g.drawImage(renderer.domElement, 0, 0, L, H);
+        if (logo.complete && logo.naturalWidth) { const lh = 46, lw = lh * logo.naturalWidth / logo.naturalHeight; g.fillStyle = "#fff"; g.fillRect(28, 40, lw + 28, lh + 20); g.drawImage(logo, 42, 50, lw, lh); }
+        g.font = "600 30px Inter, Arial, sans-serif"; g.textAlign = "center"; g.fillStyle = "rgba(20,19,18,.55)"; g.fillRect(L / 2 - 170, H - 104, 340, 52);
+        g.fillStyle = "#fff"; g.fillText("karenovation.fr", L / 2, H - 67);
+        compteur.textContent = Math.max(0, Math.ceil((duree - (performance.now() - this.debut)) / 1000));
+        if (performance.now() - this.debut >= duree && rec.state === "recording") rec.stop();
+      }
+    };
+    rec.start(250);
+    await new Promise(ok => { rec.onstop = ok; });
+    tournage = null; controles.enabled = true; bouton.disabled = false; bandeau.hidden = true;
+    renderer.setPixelRatio(rapport); renderer.setSize(taille.x, taille.y, false); camera.aspect = taille.x / taille.y; camera.updateProjectionMatrix();
+    const ext = type.startsWith("video/mp4") ? "mp4" : "webm";
+    const fichier = new File([new Blob(morceaux, { type: type.split(";")[0] })], `simulation-${(client?.nom || "salle-de-bain").toLowerCase()}.${ext}`, { type: type.split(";")[0] });
+    if (navigator.canShare && navigator.canShare({ files: [fichier] })) { try { await navigator.share({ files: [fichier], title: "Simulation KA Rénovation" }); return; } catch (er) { if (er.name === "AbortError") return; } }
+    const a = document.createElement("a"); a.href = URL.createObjectURL(fichier); a.download = fichier.name; a.click();
+    toast("Vidéo enregistrée ✓");
+  };
   document.getElementById("clientSim").onclick = () => choisirClient(c => { client = c; document.getElementById("clientSim").textContent = nomClient(c); });
   document.getElementById("titreSim").onclick = () => { const n = prompt("Nom de la simulation", etat.nom); if (n) { etat.nom = n; document.getElementById("titreSim").textContent = n; } };
   const enregistrer = async () => {
