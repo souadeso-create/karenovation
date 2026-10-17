@@ -115,6 +115,13 @@
   .fenetre { background: var(--fond); width: 100%; max-width: 620px; max-height: 88vh; overflow: auto; border-radius: 20px 20px 0 0; padding: 20px 16px calc(20px + env(safe-area-inset-bottom)); }
   .fenetre .tete { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
   .cat-titre { font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--gris); margin: 16px 0 6px; }
+  .groupe-ajout { border-bottom: 1px solid var(--sable); }
+  .groupe-ajout summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; padding: 14px 2px; font-weight: 600; font-size: 15px; }
+  .groupe-ajout summary::-webkit-details-marker { display: none; }
+  .groupe-ajout summary span { margin-left: auto; margin-right: 12px; font-size: 12px; font-weight: 500; color: var(--gris); }
+  .groupe-ajout summary::after { content: "+"; font-size: 20px; font-weight: 400; color: var(--gris); width: 16px; text-align: center; }
+  .groupe-ajout[open] summary::after { content: "–"; }
+  .groupe-ajout .objets { padding-bottom: 14px; }
   .choix { display: flex; justify-content: space-between; gap: 10px; width: 100%; text-align: left; background: #fff; border: 1px solid transparent; border-radius: 12px; padding: 12px 14px; margin-bottom: 6px; cursor: pointer; }
   .choix:hover { border-color: var(--sable); }
 

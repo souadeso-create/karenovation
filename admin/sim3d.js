@@ -435,7 +435,8 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
           <p class="gris" style="font-size:13px;margin-top:6px" id="nomRobinet">${esc(ROBINETTERIE[etat.robinetterie]?.nom || "")}</p>
         </fieldset>
         <fieldset><legend>Ajouter</legend>
-          ${GROUPES.map(gp => `<div class="cat-titre">${gp}</div><div class="objets">${Object.entries(CAT).filter(([, c]) => c.groupe === gp).map(([k, c]) => `<button type="button" data-ajout="${k}">${esc(c.nom)}</button>`).join("")}</div>`).join("")}
+          ${GROUPES.map(gp => { const items = Object.entries(CAT).filter(([, c]) => c.groupe === gp);
+            return `<details class="groupe-ajout"><summary>${gp}<span>${items.length}</span></summary><div class="objets">${items.map(([k, c]) => `<button type="button" data-ajout="${k}">${esc(c.nom)}</button>`).join("")}</div></details>`; }).join("")}
         </fieldset>
       </div>
     </div>`;
