@@ -231,6 +231,8 @@
   .liens a:hover { border-color: var(--encre); }
   .encart { background: var(--pierre); padding: 26px 22px; margin-top: 40px; }
   .encart p { margin-bottom: 16px; }
+  .encart .btn { margin: 0 8px 8px 0; }
+  .btn-contour-sombre { border-color: var(--encre); color: var(--encre); background: transparent; }
   @media (min-width: 760px) { .photos { grid-template-columns: repeat(3, 1fr); } .photos img:first-child { grid-column: span 1; aspect-ratio: 3 / 4; } }
 
   .credit { font-size: 12px; color: #77716a; }
