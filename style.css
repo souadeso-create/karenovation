@@ -214,6 +214,7 @@
   .fil a { color: rgba(255,255,255,.8); text-decoration: none; }
   .heros.page { min-height: 72svh; }
   .texte { max-width: 760px; }
+  .texte h2 { scroll-margin-top: 90px; }
   .texte h2 { margin: 56px 0 16px; font-size: clamp(28px, 6vw, 42px); }
   .texte p { color: #3d3a35; font-size: 17px; margin-bottom: 14px; }
   .texte ul { margin: 6px 0 18px 0; padding: 0; list-style: none; }

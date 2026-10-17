@@ -131,7 +131,9 @@
   .methode { overflow: hidden; }
   .defile { display: grid; grid-auto-flow: column; grid-auto-columns: 78%; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; margin-top: 40px; padding-bottom: 10px; scrollbar-width: none; }
   .defile::-webkit-scrollbar { display: none; }
-  .etape { scroll-snap-align: start; }
+  .etape { scroll-snap-align: start; display: block; text-decoration: none; color: inherit; }
+  .etape .lire { display: inline-block; margin-top: 10px; font-size: 13px; font-weight: 600; letter-spacing: .04em; color: var(--encre); border-bottom: 1px solid var(--filet); padding-bottom: 2px; }
+  .etape:hover img { transform: scale(1.03); } .etape img { transition: transform .5s ease; }
   .etape .photo { aspect-ratio: 4 / 5; overflow: hidden; background: var(--pierre); }
   .etape img { width: 100%; height: 100%; object-fit: cover; }
   .etape .num { font-family: var(--serif); font-size: 15px; color: var(--clair); margin-top: 16px; }
@@ -397,12 +399,12 @@
       <h2>Étape par étape,<br><i>sans mauvaise surprise.</i></h2>
     </div>
     <div class="defile">
-      <article class="etape"><div class="photo"><img src="medias/bleu-avant.jpg" alt="" loading="lazy"></div><div class="num">01</div><h3>Visite &amp; devis</h3><p>Vos photos donnent une première estimation. Puis on vient voir la pièce sur rendez-vous : devis gratuit, détaillé ligne par ligne.</p></article>
-      <article class="etape"><div class="photo"><img src="medias/etape-demolition.jpg" alt="" loading="lazy"></div><div class="num">02</div><h3>Dépose</h3><p>Anciens sanitaires, carrelage et faux plafond déposés, gravats évacués en déchetterie.</p></article>
-      <article class="etape"><div class="photo"><img src="medias/etape-plomberie.jpg" alt="" loading="lazy"></div><div class="num">03</div><h3>Plomberie</h3><p>Nouvelles arrivées et évacuations, placées exactement là où il faut.</p></article>
-      <article class="etape"><div class="photo"><img src="medias/etape-etancheite.jpg" alt="" loading="lazy"></div><div class="num">04</div><h3>Étanchéité</h3><p>Système d'étanchéité sous carrelage, bandes renforcées dans les angles.</p></article>
-      <article class="etape"><div class="photo"><img src="medias/etape-carrelage.jpg" alt="" loading="lazy"></div><div class="num">05</div><h3>Carrelage</h3><p>Sols et murs, coupes nettes, joints réguliers.</p></article>
-      <article class="etape"><div class="photo"><img src="medias/combles-colonne.jpg" alt="" loading="lazy"></div><div class="num">06</div><h3>Finitions</h3><p>Meubles, paroi, éclairage, nettoyage : la pièce est prête à vivre.</p></article>
+      <a class="etape" href="conseils/preparer-le-rendez-vous-de-devis/"><div class="photo"><img src="medias/bleu-avant.jpg" alt="" loading="lazy"></div><div class="num">01</div><h3>Visite &amp; devis</h3><p>Vos photos donnent une première estimation. Puis on vient voir la pièce sur rendez-vous : devis gratuit, détaillé ligne par ligne.</p><span class="lire">Lire l'article →</span></a>
+      <a class="etape" href="conseils/baignoire-douche-deroulement-du-chantier/#la-depose"><div class="photo"><img src="medias/etape-demolition.jpg" alt="" loading="lazy"></div><div class="num">02</div><h3>Dépose</h3><p>Anciens sanitaires, carrelage et faux plafond déposés, gravats évacués en déchetterie.</p><span class="lire">Lire l'article →</span></a>
+      <a class="etape" href="conseils/baignoire-douche-deroulement-du-chantier/#la-plomberie-et-le-support"><div class="photo"><img src="medias/etape-plomberie.jpg" alt="" loading="lazy"></div><div class="num">03</div><h3>Plomberie</h3><p>Nouvelles arrivées et évacuations, placées exactement là où il faut.</p><span class="lire">Lire l'article →</span></a>
+      <a class="etape" href="conseils/etancheite-douche-italienne/"><div class="photo"><img src="medias/etape-etancheite.jpg" alt="" loading="lazy"></div><div class="num">04</div><h3>Étanchéité</h3><p>Système d'étanchéité sous carrelage, bandes renforcées dans les angles.</p><span class="lire">Lire l'article →</span></a>
+      <a class="etape" href="conseils/quel-carrelage-choisir-salle-de-bain/"><div class="photo"><img src="medias/etape-carrelage.jpg" alt="" loading="lazy"></div><div class="num">05</div><h3>Carrelage</h3><p>Sols et murs, coupes nettes, joints réguliers.</p><span class="lire">Lire l'article →</span></a>
+      <a class="etape" href="conseils/baignoire-douche-deroulement-du-chantier/#les-finitions"><div class="photo"><img src="medias/combles-colonne.jpg" alt="" loading="lazy"></div><div class="num">06</div><h3>Finitions</h3><p>Meubles, paroi, éclairage, nettoyage : la pièce est prête à vivre.</p><span class="lire">Lire l'article →</span></a>
     </div>
     <p class="glisser">← Faites défiler les étapes →</p>
   </div>
