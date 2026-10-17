@@ -155,7 +155,11 @@ export async function creerPDF(d, p) {
     pdf.setFont("helvetica", "normal").setFontSize(7.8).setTextColor(...GRIS);
     pdf.text(pdf.splitTextToSize("Datée et précédée de la mention « Reçu avant l'exécution des travaux, bon pour accord pour un net à payer de", sw - 8), sx + 4, y + 11);
     pdf.setFont("helvetica", "bold").setFontSize(9).setTextColor(...ENCRE).text(`${eur(t.ht)} € »`, sx + 4, y + 20.5);
-    pdf.setFont("helvetica", "normal").setFontSize(7.8).setTextColor(...GRIS).text("Le : ......./......./.......", sx + 4, y + 27.5);
+    if (d.signe_le) {
+      const quand = new Date(d.signe_le);
+      pdf.setFont("helvetica", "normal").setFontSize(7.8).setTextColor(...GRIS)
+        .text(pdf.splitTextToSize(propre(`Signé en ligne le ${quand.toLocaleDateString("fr-FR")} à ${quand.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} par ${d.signe_nom || ""}`), sw - 8).slice(0, 2), sx + 4, y + 25.5);
+    } else pdf.setFont("helvetica", "normal").setFontSize(7.8).setTextColor(...GRIS).text("Le : ......./......./.......", sx + 4, y + 27.5);
     y += 38;
   }
 

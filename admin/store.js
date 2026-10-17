@@ -87,6 +87,19 @@ export async function supprimer(table, id) {
   if (error) throw error;
 }
 
+/* ---------- Photos des demandes (dossier privé) ---------- */
+export async function photosDemande(chemins) {
+  if (MODE_ESSAI || !chemins?.length) return [];
+  const { data, error } = await sb.storage.from("demandes").createSignedUrls(chemins, 3600);
+  if (error) throw error;
+  return data.map(x => x.signedUrl).filter(Boolean);
+}
+export async function supprimerPhotosDemande(chemins) {
+  if (MODE_ESSAI || !chemins?.length) return;
+  const { error } = await sb.storage.from("demandes").remove(chemins);
+  if (error) throw error;
+}
+
 /* ---------- Paramètres de l'entreprise ---------- */
 export async function parametres() {
   let p;
@@ -118,5 +131,6 @@ export async function exporterTout() {
   const tables = ["clients", "prestations", "documents", "simulations"];
   const out = { exporte_le: new Date().toISOString(), parametres: await parametres() };
   for (const t of tables) out[t] = await lister(t);
+  try { out.demandes = await lister("demandes"); } catch { /* table pas encore créée */ }
   return out;
 }

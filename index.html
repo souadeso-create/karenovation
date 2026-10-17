@@ -195,6 +195,32 @@
   .infos b { display: block; color: #fff; font-weight: 500; margin-bottom: 4px; font-size: 12px; letter-spacing: .2em; text-transform: uppercase; }
   .infos a { text-decoration: none; color: #f1ede6; }
 
+  /* Formulaire de demande */
+  .demande { margin-top: 56px; padding-top: 40px; border-top: 1px solid rgba(255,255,255,.12); }
+  .demande h3 { font-size: clamp(28px, 7vw, 40px); color: #fff; }
+  .demande h3 i { color: var(--clair); }
+  .demande form { display: grid; gap: 14px; margin-top: 26px; max-width: 720px; }
+  .demande label { display: grid; gap: 6px; font-size: 12px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--clair); }
+  .demande input, .demande textarea, .demande select { font: 16px var(--sans); color: #fff; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.18); border-radius: 12px; padding: 14px 16px; width: 100%; letter-spacing: 0; text-transform: none; }
+  .demande select option { color: var(--encre); }
+  .demande input:focus, .demande textarea:focus, .demande select:focus { outline: none; border-color: #fff; }
+  .demande textarea { min-height: 130px; resize: vertical; }
+  .demande .duo { display: grid; gap: 14px; }
+  .demande .depot { display: flex; align-items: center; justify-content: center; gap: 10px; border: 1px dashed rgba(255,255,255,.35); border-radius: 12px; padding: 20px; cursor: pointer; color: #f1ede6; font-size: 15px; text-transform: none; letter-spacing: 0; font-weight: 500; }
+  .demande .depot input { display: none; }
+  .vignettes { display: flex; flex-wrap: wrap; gap: 8px; }
+  .vignettes:empty { display: none; }
+  .vignettes figure { position: relative; width: 74px; height: 74px; border-radius: 10px; overflow: hidden; }
+  .vignettes img { width: 100%; height: 100%; object-fit: cover; }
+  .vignettes button { position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; border-radius: 50%; border: 0; background: rgba(0,0,0,.65); color: #fff; font-size: 15px; line-height: 1; cursor: pointer; }
+  .demande .petit { font-size: 13px; color: var(--clair); }
+  .demande .btn-clair { justify-self: start; }
+  .demande .btn[disabled] { opacity: .6; cursor: wait; }
+  .retour { padding: 16px 18px; border-radius: 12px; font-size: 15px; display: none; }
+  .retour.ok { display: block; background: rgba(255,255,255,.08); color: #fff; }
+  .retour.erreur { display: block; background: rgba(200,20,26,.18); color: #fff; }
+  .piege { position: absolute; left: -9999px; width: 1px; height: 1px; }
+
   footer { background: var(--sombre); color: #77716a; font-size: 13px; padding: 0 0 36px; }
   footer .bloc { border-top: 1px solid rgba(255,255,255,.08); padding-top: 26px; display: flex; flex-direction: column; gap: 10px; }
   footer a { color: #b9b2a8; }
@@ -227,6 +253,7 @@
   @media (prefers-reduced-motion: reduce) { .apparait { opacity: 1; transform: none; } html { scroll-behavior: auto; } }
 
   @media (min-width: 760px) {
+    .demande .duo { grid-template-columns: 1fr 1fr; }
     body { padding-bottom: 0; }
     .barre { display: none; }
     nav.menu { display: flex; }
@@ -434,6 +461,8 @@
     <div class="liens-zone"><a href="renovation-salle-de-bain-chanteloup-les-vignes/">Chanteloup-les-Vignes</a><a href="renovation-salle-de-bain-andresy/">Andrésy</a><a href="renovation-salle-de-bain-poissy/">Poissy</a><a href="renovation-salle-de-bain-conflans-sainte-honorine/">Conflans-Sainte-Honorine</a><a href="renovation-salle-de-bain-saint-germain-en-laye/">Saint-Germain-en-Laye</a><a href="renovation-salle-de-bain-carrieres-sous-poissy/">Carrières-sous-Poissy</a><a href="renovation-salle-de-bain-triel-sur-seine/">Triel-sur-Seine</a><a href="renovation-salle-de-bain-cergy/">Cergy</a><a href="renovation-salle-de-bain-massy/">Massy</a><a href="renovation-salle-de-bain-sceaux/">Sceaux</a></div>
     <p class="intro" style="margin-top:26px">Nos prestations en détail :</p>
     <div class="liens-zone"><a href="renovation-salle-de-bain/">Rénovation complète</a><a href="douche-a-litalienne/">Douche à l'italienne</a><a href="remplacement-baignoire-par-douche/">Baignoire → douche</a><a href="wc-suspendu/">WC suspendu</a><a href="carrelage-salle-de-bain/">Carrelage &amp; faïence</a></div>
+    <p class="intro" style="margin-top:26px">Nos conseils :</p>
+    <div class="liens-zone"><a href="conseils/baignoire-douche-deroulement-du-chantier/">Baignoire → douche : le chantier</a><a href="conseils/etancheite-douche-italienne/">L'étanchéité d'une douche</a><a href="conseils/petite-salle-de-bain-gagner-de-la-place/">Petite salle de bain</a><a href="conseils/preparer-le-rendez-vous-de-devis/">Préparer le rendez-vous</a><a href="conseils/">Tous les conseils</a></div>
   </div>
 </section>
 
@@ -464,6 +493,36 @@
         <a class="btn btn-clair" href="https://wa.me/33763147627?text=Bonjour%2C%20je%20souhaite%20un%20devis%20pour%20ma%20salle%20de%20bain." target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="#25d366"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.3-.7-2.8-1.1-4.5-4-4.7-4.2-.1-.2-1.1-1.5-1.1-2.9s.7-2 1-2.3c.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.2.1.4 0 .5l-.4.6-.4.4c-.1.1-.3.3-.1.6.2.3.8 1.3 1.7 2.1 1.2 1 2.1 1.3 2.4 1.5.3.1.5.1.6-.1l.9-1c.2-.3.4-.2.7-.1l1.9.9c.3.1.5.2.5.3.1.2.1.8-.1 1.4z"/></svg>Écrire sur WhatsApp</a>
         <a class="btn btn-trait" href="mailto:karenovation@outlook.fr?subject=Demande%20de%20devis%20salle%20de%20bain">karenovation@outlook.fr</a>
       </div>
+    </div>
+    <div class="demande apparait" id="demande">
+      <span class="label">Demande de devis</span>
+      <h3>Décrivez votre projet,<br><i>joignez vos photos.</i></h3>
+      <p class="intro">On vous rappelle pour une première estimation et pour fixer le rendez-vous du devis sur place.</p>
+      <form id="form-demande" novalidate>
+        <div class="duo">
+          <label>Nom et prénom<input name="nom" autocomplete="name" required maxlength="120"></label>
+          <label>Téléphone<input name="tel" type="tel" autocomplete="tel" required maxlength="40"></label>
+        </div>
+        <div class="duo">
+          <label>E-mail<input name="email" type="email" autocomplete="email" maxlength="160"></label>
+          <label>Ville ou code postal<input name="ville" autocomplete="address-level2" maxlength="80"></label>
+        </div>
+        <label>Vos travaux<select name="travaux">
+          <option>Rénovation complète de salle de bain</option>
+          <option>Douche à l'italienne</option>
+          <option>Remplacer la baignoire par une douche</option>
+          <option>WC suspendu</option>
+          <option>Carrelage, faïence</option>
+          <option>Autre</option>
+        </select></label>
+        <label>Votre message<textarea name="message" maxlength="3500" placeholder="Dimensions approximatives, ce que vous aimeriez changer, vos disponibilités…"></textarea></label>
+        <label class="depot"><input type="file" id="photos" accept="image/*" multiple><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Ajouter des photos de la pièce</label>
+        <div class="vignettes" id="vignettes"></div>
+        <p class="petit">Jusqu'à 8 photos. Vos coordonnées servent uniquement à vous recontacter pour ce projet.</p>
+        <input class="piege" name="site" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <button class="btn btn-clair" type="submit" id="envoyer">Envoyer ma demande</button>
+        <div class="retour" id="retour" role="status"></div>
+      </form>
     </div>
     <div class="infos apparait">
       <div><b>Horaires</b>Lundi au vendredi, 8 h – 18 h 30<br>Samedi sur rendez-vous</div>
@@ -514,6 +573,76 @@
   const fermer = () => { vis.classList.remove("ouverte"); contenu.innerHTML = ""; };
   vis.addEventListener("click", e => { if (e.target === vis || e.target.tagName === "BUTTON") fermer(); });
   document.addEventListener("keydown", e => { if (e.key === "Escape") fermer(); });
+
+  /* Demande de devis : photos réduites dans le téléphone, déposées dans la base, puis un e-mail pour prévenir */
+  const BASE = "https://bafrmnkorenfavwnvsyh.supabase.co", CLE = "sb_publishable_FBsYL_tD0y-F-2Bt-7KZzg_Z4UIpXpK";
+  const MAIL = "https://formsubmit.co/ajax/karenovation@outlook.fr";
+  const form = document.getElementById("form-demande"), retour = document.getElementById("retour"), bouton = document.getElementById("envoyer");
+  const vignettes = document.getElementById("vignettes");
+  let photos = [];
+  const afficherPhotos = () => {
+    vignettes.innerHTML = "";
+    photos.forEach((f, i) => {
+      const fig = document.createElement("figure");
+      fig.innerHTML = `<img alt=""><button type="button" aria-label="Retirer la photo">×</button>`;
+      fig.querySelector("img").src = URL.createObjectURL(f);
+      fig.querySelector("button").onclick = () => { photos.splice(i, 1); afficherPhotos(); };
+      vignettes.appendChild(fig);
+    });
+  };
+  document.getElementById("photos").addEventListener("change", e => {
+    photos = photos.concat([...e.target.files]).slice(0, 8);
+    e.target.value = "";
+    afficherPhotos();
+  });
+  const reduire = f => new Promise(ok => {
+    const img = new Image(), url = URL.createObjectURL(f);
+    img.onload = () => {
+      const r = Math.min(1, 1800 / Math.max(img.width, img.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.width * r); c.height = Math.round(img.height * r);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      c.toBlob(b => ok(b || f), "image/jpeg", .82);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); ok(f); };
+    img.src = url;
+  });
+  const entetes = { apikey: CLE, Authorization: "Bearer " + CLE };
+  const dire = (classe, texte) => { retour.className = "retour " + classe; retour.textContent = texte; };
+  form.addEventListener("submit", async e => {
+    e.preventDefault();
+    const v = Object.fromEntries(new FormData(form));
+    if (v.site) return;
+    if (!v.nom.trim() || !v.tel.trim()) { dire("erreur", "Merci d'indiquer votre nom et votre téléphone."); return; }
+    bouton.disabled = true; bouton.textContent = photos.length ? "Envoi des photos…" : "Envoi…";
+    try {
+      const id = crypto.randomUUID(), chemins = [];
+      for (const [i, f] of photos.entries()) {
+        const b = await reduire(f), type = b.type || "image/jpeg";
+        const chemin = `${id}/${i + 1}.${type === "image/jpeg" ? "jpg" : type.split("/")[1]}`;
+        const r = await fetch(`${BASE}/storage/v1/object/demandes/${chemin}`, { method: "POST", headers: { ...entetes, "Content-Type": type }, body: b });
+        if (!r.ok) throw new Error("photo");
+        chemins.push(chemin);
+      }
+      const cp = (v.ville.match(/\b\d{5}\b/) || [""])[0];
+      const r = await fetch(`${BASE}/rest/v1/demandes`, {
+        method: "POST", headers: { ...entetes, "Content-Type": "application/json", Prefer: "return=minimal" },
+        body: JSON.stringify({ id, nom: v.nom.trim(), tel: v.tel.trim(), email: v.email.trim() || null, cp: cp || null,
+          ville: v.ville.replace(cp, "").trim() || null, message: `${v.travaux}\n\n${v.message.trim()}`.trim(), photos: chemins })
+      });
+      if (!r.ok) throw new Error("demande");
+      fetch(MAIL, { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ _subject: `Nouvelle demande de devis — ${v.nom.trim()}`, _template: "table", _captcha: "false",
+          Nom: v.nom, "Téléphone": v.tel, "E-mail": v.email, Ville: v.ville, Travaux: v.travaux, Message: v.message,
+          Photos: chemins.length ? `${chemins.length} photo(s), à voir dans l'admin, onglet Demandes` : "aucune" }) }).catch(() => {});
+      form.reset(); photos = []; afficherPhotos();
+      dire("ok", "Merci, votre demande est bien arrivée. On vous rappelle très vite.");
+    } catch (err) {
+      dire("erreur", "L'envoi n'a pas abouti. Réessayez, ou appelez-nous au 07 63 14 76 27.");
+    }
+    bouton.disabled = false; bouton.textContent = "Envoyer ma demande";
+  });
 </script>
 </body>
 </html>

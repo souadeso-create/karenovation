@@ -19,6 +19,7 @@ const ICO = {
   bas: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m6 9 6 6 6-6"/></svg>',
   devis: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/></svg>',
   client: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>',
+  boite: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 13h5l1.5 3h5l1.5-3h5"/><path d="M5.5 5h13L21 13v6H3v-6z"/></svg>',
   cube: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9z"/><path d="m4 7.5 8 4.5 8-4.5M12 12v9"/></svg>'
 };
 const STATUTS = {
@@ -28,6 +29,22 @@ const STATUTS = {
 const libelleStatut = (type, s) => (STATUTS[type].find(x => x[0] === s) || [s, s])[1];
 
 let P = null; // paramètres de l'entreprise
+const lienSignature = d => d.jeton ? location.origin + location.pathname.replace(/admin\/.*$/, "") + "devis/?d=" + d.jeton : "";
+const numeroWa = t => { const n = String(t || "").replace(/\D/g, ""); return n.startsWith("0") ? "33" + n.slice(1) : n; };
+const politesse = c => c ? [c.civilite, c.nom].filter(Boolean).join(" ") : "";
+const msgSignature = d => `Bonjour ${politesse(d.client)},\n\nVoici votre devis ${d.numero} de KA Rénovation. Vous pouvez le lire, le télécharger et le signer en ligne ici :\n${lienSignature(d)}\n\nBonne journée,\nKA Rénovation`;
+const msgRelance = d => `Bonjour ${politesse(d.client)},\n\nJe reviens vers vous au sujet du devis ${d.numero}. Il est toujours consultable et à signer en ligne ici :\n${lienSignature(d)}\n\nN'hésitez pas si vous avez des questions.\nKA Rénovation`;
+const SEPT_JOURS = 7 * 864e5;
+const aRelancer = d => d.type === "devis" && d.statut === "envoye" && !d.signe_le && d.jeton && Date.now() - new Date(d.updated_at || d.created_at) > SEPT_JOURS;
+async function listerDemandes() { try { return await db.lister("demandes"); } catch { return null; } }
+
+/* Envoie un message : WhatsApp si le client a un téléphone, sinon le partage du téléphone, sinon copie. */
+async function envoyerMessage(d, texte) {
+  const tel = numeroWa(d.client?.tel);
+  if (tel.length >= 10) { window.open(`https://wa.me/${tel}?text=${encodeURIComponent(texte)}`, "_blank"); return; }
+  if (navigator.share) { try { await navigator.share({ text: texte }); return; } catch (e) { if (e.name === "AbortError") return; } }
+  await navigator.clipboard.writeText(texte); toast("Message copié ✓");
+}
 
 function toast(msg) {
   const t = document.createElement("div"); t.className = "toast"; t.textContent = msg;
@@ -53,7 +70,9 @@ function confirmer(message, oui = "Confirmer") {
 
 /* =================== Accueil =================== */
 async function vueAccueil() {
-  const [docs, clients] = await Promise.all([db.lister("documents"), db.lister("clients")]);
+  const [docs, clients, demandes] = await Promise.all([db.lister("documents"), db.lister("clients"), listerDemandes()]);
+  const nouvelles = (demandes || []).filter(x => x.statut === "nouvelle");
+  const relances = docs.filter(aRelancer);
   const devisAttente = docs.filter(d => d.type === "devis" && ["brouillon", "envoye"].includes(d.statut));
   const aEncaisser = docs.filter(d => d.type === "facture" && d.statut === "envoye");
   const mois = aujourdhui().slice(0, 7);
@@ -67,6 +86,10 @@ async function vueAccueil() {
       <div class="stat"><span class="petit">Encaissé ce mois</span><b>${eur(somme(encaisse))} €</b></div>
       <div class="stat"><span class="petit">Clients</span><b>${clients.length}</b></div>
     </div>
+    ${nouvelles.length ? `<a class="alerte" href="#/demandes">${ICO.boite}<span><b>${nouvelles.length} nouvelle${nouvelles.length > 1 ? "s" : ""} demande${nouvelles.length > 1 ? "s" : ""} de devis</b><small>${esc(nouvelles.slice(0, 3).map(x => x.nom).join(", "))}</small></span><span>›</span></a>` : ""}
+    ${relances.length ? `<h2 style="margin-bottom:12px">À relancer</h2>
+    <p class="gris" style="font-size:14px;margin:-6px 0 12px">Devis envoyés il y a plus de 7 jours, toujours sans réponse.</p>
+    <div class="liste" id="relances" style="margin-bottom:26px">${relances.map(d => `<div class="ligne-liste"><a href="#/document/${d.id}" style="text-decoration:none;flex:1"><b>${esc(d.numero)}</b><small>${esc(nomClient(d.client))} · envoyé le ${dateFr(String(d.updated_at || d.created_at).slice(0, 10))}</small></a><button class="btn clair" data-relance="${d.id}">Relancer</button></div>`).join("")}</div>` : ""}
     <div class="raccourcis">
       <a href="#/document/nouveau/devis">${ICO.devis}Nouveau devis</a>
       <a href="#/document/nouveau/facture">${ICO.devis}Nouvelle facture</a>
@@ -75,6 +98,14 @@ async function vueAccueil() {
     </div>
     <h2 style="margin-bottom:12px">Derniers documents</h2>
     <div class="liste">${docs.slice(0, 6).map(ligneDoc).join("") || '<p class="vide">Aucun document pour l\'instant.</p>'}</div>`;
+  const r = document.getElementById("relances");
+  if (r) r.onclick = async e => {
+    const b = e.target.closest("[data-relance]"); if (!b) return;
+    const d = relances.find(x => x.id === b.dataset.relance);
+    await envoyerMessage(d, msgRelance(d));
+    try { await db.enregistrer("documents", { ...d }); } catch (er) { erreur(er); } // repart pour 7 jours
+    b.closest(".ligne-liste").remove(); toast("Relance envoyée ✓");
+  };
 }
 
 function ligneDoc(d) {
@@ -160,6 +191,10 @@ async function vueDocument(id, type, params) {
             ${d.id ? `<button class="btn discret" id="dupliquer">Dupliquer</button>` : ""}
             ${d.id && (estDevis || d.statut === "brouillon") ? `<button class="btn danger" id="suppr">${ICO.poubelle}Supprimer</button>` : ""}
           </div>
+          ${estDevis && d.id && d.jeton ? (d.signe_le
+            ? `<div class="carte signe-ok"><b>✓ Signé en ligne</b><small>le ${new Date(d.signe_le).toLocaleString("fr-FR", { dateStyle: "long", timeStyle: "short" })} par ${esc(d.signe_nom)}</small></div>`
+            : `<div class="carte" style="margin-bottom:12px"><b>Signature en ligne</b><p class="gris" style="font-size:14px;margin:4px 0 12px">Le client reçoit un lien pour lire, télécharger et signer ce devis sur son téléphone.</p>
+              <div class="actions-doc" style="margin:0"><button class="btn" id="envoiLien">${ICO.partage}Envoyer le lien</button><button class="btn discret" id="copieLien">Copier le lien</button></div></div>`) : ""}
           ${!estDevis && d.devis_numero ? `<p class="gris" style="font-size:14px">Facture du devis ${esc(d.devis_numero)}${d.devis_date ? " du " + dateFr(d.devis_date) : ""}.</p>` : ""}
           ${d.client_id ? `<p style="margin-top:8px"><a class="gris" href="#/client/${d.client_id}">Voir la fiche client ›</a></p>` : ""}
         </div>
@@ -250,10 +285,20 @@ async function vueDocument(id, type, params) {
         toast("Facture créée ✓"); location.hash = "#/document/" + n.id;
       } catch (e) { erreur(e); }
     };
+    const el = document.getElementById("envoiLien");
+    if (el) el.onclick = async () => {
+      try {
+        await enregistrer();
+        await envoyerMessage(d, msgSignature(d));
+        if (d.statut === "brouillon") { d.statut = "envoye"; modifie = true; await enregistrer(); dessiner(); }
+      } catch (e) { erreur(e); }
+    };
+    const cl = document.getElementById("copieLien");
+    if (cl) cl.onclick = async () => { await navigator.clipboard.writeText(lienSignature(d)); toast("Lien copié ✓"); };
     const du = document.getElementById("dupliquer");
     if (du) du.onclick = async () => {
       const copie = { ...JSON.parse(JSON.stringify(d)), id: undefined, created_at: undefined, numero: numeroSuivant(d.type), date: aujourdhui(), statut: "brouillon", devis_id: null, devis_numero: null, devis_date: null };
-      delete copie.id; delete copie.created_at;
+      delete copie.id; delete copie.created_at; delete copie.jeton; delete copie.signe_le; delete copie.signe_nom;
       try { const n = await enregistrerNouveau(copie); toast("Copie créée ✓"); location.hash = "#/document/" + n.id; } catch (e) { erreur(e); }
     };
     const su = document.getElementById("suppr");
@@ -326,6 +371,70 @@ async function choisirPrestation(rappel) {
   aff("");
   f.el.querySelector("#rp").oninput = e => aff(e.target.value);
   f.el.querySelector("#lp").onclick = e => { const b = e.target.closest("[data-id]"); if (b) { f.fermer(); rappel(ps.find(p => p.id === b.dataset.id)); } };
+}
+
+/* =================== Demandes de devis (formulaire du site) =================== */
+async function vueDemandes() {
+  const demandes = await listerDemandes();
+  if (!demandes) { vue.innerHTML = `<div class="entete"><h1>Demandes</h1></div><p class="vide">Les demandes du site arriveront ici dès que la mise à jour de la base sera faite.</p>`; return; }
+  let filtre = "nouvelle";
+  const ligne = x => `<a class="ligne-liste" href="#/demande/${x.id}"><div><b>${esc(x.nom)}</b><small>${esc([x.ville || x.cp, String(x.message || "").split("\n")[0]].filter(Boolean).join(" · "))}</small></div>
+    <div class="droite"><small class="gris">${new Date(x.created_at).toLocaleDateString("fr-FR")}</small>${x.photos?.length ? `<span class="badge">${x.photos.length} photo${x.photos.length > 1 ? "s" : ""}</span>` : ""}</div></a>`;
+  const aff = () => {
+    vue.innerHTML = `
+      <div class="entete"><h1>Demandes</h1></div>
+      <div class="onglets"><a href="" data-f="nouvelle" class="${filtre === "nouvelle" ? "actif" : ""}">Nouvelles (${demandes.filter(x => x.statut === "nouvelle").length})</a><a href="" data-f="traitee" class="${filtre === "traitee" ? "actif" : ""}">Traitées</a></div>
+      <div class="liste">${demandes.filter(x => x.statut === filtre).map(ligne).join("") || `<p class="vide">${filtre === "nouvelle" ? "Aucune nouvelle demande." : "Aucune demande traitée."}</p>`}</div>`;
+    vue.querySelectorAll("[data-f]").forEach(a => a.onclick = e => { e.preventDefault(); filtre = a.dataset.f; aff(); });
+  };
+  aff();
+}
+
+async function vueDemande(id) {
+  const x = await db.lire("demandes", id);
+  if (!x) { vue.innerHTML = '<p class="vide">Demande introuvable.</p>'; return; }
+  const tel = String(x.tel || "").replace(/\s/g, "");
+  vue.innerHTML = `
+    <div class="entete"><div><div class="petit">Demande du ${new Date(x.created_at).toLocaleDateString("fr-FR", { dateStyle: "long" })}</div><h1>${esc(x.nom)}</h1></div>
+      <span class="badge ${x.statut === "traitee" ? "signe" : "envoye"}">${x.statut === "traitee" ? "Traitée" : "Nouvelle"}</span></div>
+    <div class="deux-col">
+      <div>
+        <div class="carte" style="margin-bottom:12px">
+          ${x.tel ? `<p><span class="petit">Téléphone</span><br><a href="tel:${esc(tel)}">${esc(x.tel)}</a></p>` : ""}
+          ${x.email ? `<p style="margin-top:10px"><span class="petit">E-mail</span><br><a href="mailto:${esc(x.email)}">${esc(x.email)}</a></p>` : ""}
+          ${x.ville || x.cp ? `<p style="margin-top:10px"><span class="petit">Ville</span><br>${esc([x.cp, x.ville].filter(Boolean).join(" "))}</p>` : ""}
+          <p style="margin-top:10px"><span class="petit">Projet</span><br><span style="white-space:pre-line">${esc(x.message || "")}</span></p>
+        </div>
+        <div class="photos-demande" id="photos">${x.photos?.length ? '<p class="gris">Chargement des photos…</p>' : '<p class="gris">Pas de photo jointe.</p>'}</div>
+      </div>
+      <div>
+        <div class="actions-doc">
+          ${x.tel ? `<a class="btn" href="tel:${esc(tel)}">Appeler</a><a class="btn clair" href="https://wa.me/${numeroWa(x.tel)}" target="_blank" rel="noopener">WhatsApp</a>` : ""}
+          ${x.client_id ? `<a class="btn clair" href="#/client/${x.client_id}">${ICO.client}Fiche client</a><a class="btn clair" href="#/document/nouveau/devis?client=${x.client_id}">${ICO.plus}Devis</a>`
+            : `<button class="btn clair" id="versClient">${ICO.client}Créer la fiche client</button>`}
+          <button class="btn discret" id="traitee">${x.statut === "traitee" ? "Remettre en nouvelle" : "Marquer comme traitée"}</button>
+          <button class="btn danger" id="suppr">${ICO.poubelle}Supprimer</button>
+        </div>
+      </div>
+    </div>`;
+  if (x.photos?.length) db.photosDemande(x.photos).then(urls => {
+    document.getElementById("photos").innerHTML = urls.map(u => `<a href="${esc(u)}" target="_blank" rel="noopener"><img src="${esc(u)}" alt="Photo de la pièce"></a>`).join("");
+  }).catch(e => { document.getElementById("photos").innerHTML = '<p class="gris">Photos indisponibles.</p>'; console.error(e); });
+  document.getElementById("traitee").onclick = async () => {
+    try { await db.enregistrer("demandes", { ...x, statut: x.statut === "traitee" ? "nouvelle" : "traitee" }); vueDemande(id); } catch (e) { erreur(e); }
+  };
+  const vc = document.getElementById("versClient");
+  if (vc) vc.onclick = async () => {
+    try {
+      const c = await db.enregistrer("clients", { nom: x.nom, tel: x.tel, email: x.email, cp: x.cp, ville: x.ville, notes: x.message, archive: false });
+      await db.enregistrer("demandes", { ...x, client_id: c.id, statut: "traitee" });
+      toast("Fiche client créée ✓"); vueDemande(id);
+    } catch (e) { erreur(e); }
+  };
+  document.getElementById("suppr").onclick = async () => {
+    if (!(await confirmer(`Supprimer la demande de ${x.nom} et ses photos ?`, "Supprimer"))) return;
+    try { await db.supprimerPhotosDemande(x.photos); await db.supprimer("demandes", x.id); toast("Demande supprimée"); location.hash = "#/demandes"; } catch (e) { erreur(e); }
+  };
 }
 
 /* =================== Clients =================== */
@@ -555,13 +664,15 @@ async function routeur() {
   const [chemin, requete] = (location.hash.slice(2) || "accueil").split("?");
   const params = new URLSearchParams(requete || "");
   const [r, a, b] = chemin.split("/");
-  nav.querySelectorAll("a").forEach(x => x.classList.toggle("actif", x.dataset.r === r || (r === "document" && x.dataset.r === "documents") || (r === "client" && x.dataset.r === "clients") || (["3d", "reglages"].includes(r) && x.dataset.r === "plus")));
+  nav.querySelectorAll("a").forEach(x => x.classList.toggle("actif", x.dataset.r === r || (r === "document" && x.dataset.r === "documents") || (r === "client" && x.dataset.r === "clients") || (r === "demande" && x.dataset.r === "demandes") || (["3d", "reglages"].includes(r) && x.dataset.r === "plus")));
   window.scrollTo(0, 0);
   try {
     if (r === "accueil") await vueAccueil();
     else if (r === "documents") await vueDocuments(a === "facture" ? "facture" : "devis");
     else if (r === "document") await vueDocument(a, b || "devis", params);
     else if (r === "clients") await vueClients();
+    else if (r === "demandes") await vueDemandes();
+    else if (r === "demande") await vueDemande(a);
     else if (r === "client") await vueClient(a);
     else if (r === "prestations") await vuePrestations();
     else if (r === "plus") vuePlus();
@@ -580,5 +691,10 @@ async function demarrer() {
   P = await db.parametres();
   window.onhashchange = routeur;
   routeur();
+  listerDemandes().then(l => {
+    const n = (l || []).filter(x => x.statut === "nouvelle").length;
+    const a = nav.querySelector('[data-r="demandes"]');
+    if (a && n) a.insertAdjacentHTML("beforeend", `<span class="compte-nav">${n}</span>`);
+  });
 }
 demarrer().catch(erreur);
