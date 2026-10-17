@@ -497,7 +497,18 @@ function vueReglages() {
 async function vue3D(params) {
   vue.innerHTML = '<p class="gris">Chargement du simulateur 3D…</p>';
   const { monterSimulateur } = await import("./sim3d.js");
-  await monterSimulateur(vue, { db, params, toast, esc, choisirClient, nomClient });
+  await monterSimulateur(vue, { db, params, toast, esc, choisirClient, nomClient, creerDevis: creerDevisDepuisSimulation });
+}
+
+// Crée un devis brouillon à partir du métré de la simulation, puis l'ouvre pour le compléter.
+async function creerDevisDepuisSimulation(sections, client, nom) {
+  const d = { type: "devis", numero: numeroSuivant("devis"), date: aujourdhui(), statut: "brouillon", sections,
+    objet: client ? `Chantier - ${[client.civilite, client.nom].filter(Boolean).join(" ")}` : (nom || "Rénovation salle de bain"),
+    acompte_pct: P.acompte_pct, deja_regle: 0, client_id: client?.id || null, client: client ? instantane(client) : null,
+    notes: "Devis établi à partir de la simulation 3D, à confirmer après visite sur place." };
+  const n = await enregistrerNouveau(d);
+  toast("Devis créé à partir de la simulation ✓");
+  location.hash = "#/document/" + n.id;
 }
 
 /* =================== Connexion & routeur =================== */
