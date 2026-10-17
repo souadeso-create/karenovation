@@ -219,6 +219,9 @@
   .texte ul { margin: 6px 0 18px 0; padding: 0; list-style: none; }
   .texte li { position: relative; padding: 10px 0 10px 26px; border-bottom: 1px solid var(--sable); color: #3d3a35; }
   .texte li::before { content: ""; position: absolute; left: 0; top: 21px; width: 12px; height: 1px; background: var(--filet); }
+  .video-conseil { margin: 30px 0 10px; max-width: 360px; }
+  .video-conseil video { width: 100%; aspect-ratio: 9 / 16; object-fit: cover; border-radius: 18px; background: #000; display: block; }
+  .video-conseil figcaption { font-size: 13px; color: var(--gris); margin-top: 8px; }
   .photos { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 34px 0 6px; }
   .photos img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; background: var(--pierre); }
   .photos img:first-child { grid-column: span 2; aspect-ratio: 4 / 3; }
