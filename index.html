@@ -153,7 +153,10 @@
   .videos .label { color: var(--clair); }
   .videos h2 i { color: var(--clair); }
   .videos .intro { color: var(--clair); }
-  .pubs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 40px; max-width: 620px; }
+  .pubs { display: grid; grid-auto-flow: column; grid-auto-columns: 62%; gap: 12px; margin-top: 40px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 6px; scrollbar-width: none; }
+  .pubs::-webkit-scrollbar { display: none; }
+  .pubs video { scroll-snap-align: start; }
+  @media (min-width: 760px) { .pubs { grid-auto-flow: row; grid-template-columns: repeat(3, 1fr); max-width: 900px; overflow: visible; } }
   .pubs video { width: 100%; aspect-ratio: 9 / 16; object-fit: cover; border-radius: 18px; background: #000; }
 
   /* Avis */
@@ -420,6 +423,7 @@
       <p class="intro">Retrouvez aussi nos chantiers sur TikTok et Facebook.</p>
     </div>
     <div class="pubs apparait">
+      <video src="medias/pub-3.mp4" poster="medias/pub-3.jpg" controls playsinline preload="none"></video>
       <video src="medias/pub-1.mp4" poster="medias/pub-1.jpg" controls playsinline preload="none"></video>
       <video src="medias/pub-2.mp4" poster="medias/pub-2.jpg" controls playsinline preload="none"></video>
     </div>
