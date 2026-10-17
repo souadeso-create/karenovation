@@ -401,7 +401,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
           <button class="btn clair" id="devisSim">Créer le devis</button>
           <button class="btn clair" id="imageSim">Image</button>
           <button class="btn clair" id="videoSim">Vidéo</button>
-          <button class="btn discret" id="gptSim">Préparer pour ChatGPT</button>
+          <button class="btn discret" id="gptSim">Image réaliste avec ChatGPT</button>
           <button class="btn discret" id="vueDessus">Vue de dessus</button>
           <button class="btn discret" id="modeChantier">Mode chantier</button>
         </div>
@@ -760,7 +760,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
   }
   document.getElementById("gptSim").onclick = () => {
     const v = document.createElement("div"); v.className = "voile";
-    v.innerHTML = `<div class="fenetre" role="dialog" aria-modal="true"><div class="tete"><h2>Préparer pour ChatGPT</h2><button class="icone" data-fermer aria-label="Fermer">✕</button></div>
+    v.innerHTML = `<div class="fenetre" role="dialog" aria-modal="true"><div class="tete"><h2>Image réaliste avec ChatGPT</h2><button class="icone" data-fermer aria-label="Fermer">✕</button></div>
       <p class="gris" style="font-size:14px;margin-bottom:12px">Avec le compte ChatGPT de l'artisan : copiez le texte, ouvrez ChatGPT, collez-le et joignez l'image. Le résultat est une image d'illustration : les dimensions et les détails ne sont pas exacts.</p>
       <div class="champ"><label>À partir de</label><select id="gptSource"><option value="3d">L'image de la simulation 3D</option><option value="photo">La photo de la pièce du client</option></select></div>
       <textarea id="gptTexte" rows="12" style="font-size:13px;margin:8px 0 12px"></textarea>
