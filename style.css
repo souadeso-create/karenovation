@@ -40,7 +40,7 @@
   nav.menu { display: none; gap: 30px; }
   nav.menu a { text-decoration: none; font-size: 14px; color: var(--gris); }
   nav.menu a:hover { color: var(--encre); }
-  .tel-haut { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; font-size: 14px; font-weight: 600; }
+  .tel-haut { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; font-size: 14px; font-weight: 600; background: var(--encre); color: #fff; padding: 9px 16px; border-radius: 999px; }
   .tel-haut svg { width: 16px; height: 16px; }
 
   /* Héros */
