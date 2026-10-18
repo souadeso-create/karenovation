@@ -402,6 +402,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
           <button class="btn clair" id="imageSim">Image</button>
           <button class="btn clair" id="videoSim">Vidéo</button>
           <button class="btn discret" id="gptSim">Image réaliste avec ChatGPT</button>
+          <button class="btn clair" id="plan2d">Plan 2D</button>
           <button class="btn discret" id="vueDessus">Vue de dessus</button>
           <button class="btn discret" id="modeChantier">Mode chantier</button>
         </div>
@@ -734,6 +735,116 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     const a = document.createElement("a"); a.href = URL.createObjectURL(fichier); a.download = fichier.name; a.click();
     toast("Vidéo enregistrée ✓");
   };
+  /* --- Plan 2D coté (vu de dessus, à l'échelle) --- */
+  const COURT = { douche: "Douche", baignoire: "Baignoire", ilot: "Baignoire îlot", laveMains: "Lave-mains", wc: "WC", wcSol: "WC", vasque: "Meuble vasque",
+    double: "Double vasque", vasquePoser: "Vasque à poser", colonne: "Colonne", armoire: "Armoire", meubleHaut: "Meuble haut", etagere: "Étagère", banc: "Banc",
+    laveLinge: "Lave-linge", radiateur: "Sèche-serv.", radiateurEau: "Radiateur", miroir: "Miroir", miroirRect: "Miroir" };
+  const EN_HAUTEUR = ["armoire", "meubleHaut", "etagere", "miroir", "miroirRect"];
+  function dessinerPlan(cv) {
+    const W = 1600, Hc = 1200; cv.width = W; cv.height = Hc;
+    const g = cv.getContext("2d"), { l, p } = etat.dims;
+    const marge = 170, ech = Math.min((W - 2 * marge) / l, (Hc - 2 * marge - 90) / p);
+    const ox = (W - l * ech) / 2, oy = marge + ((Hc - 2 * marge - 90) - p * ech) / 2;
+    const X = x => ox + (x + l / 2) * ech, Y = z => oy + (z + p / 2) * ech;
+    const ENCRE = "#1b1a18", GRIS = "#6d675f";
+    g.fillStyle = "#fff"; g.fillRect(0, 0, W, Hc);
+    // sol
+    g.fillStyle = "#f4f1ec"; g.fillRect(X(-l / 2), Y(-p / 2), l * ech, p * ech);
+    // murs (10 cm)
+    const ep = .1 * ech; g.fillStyle = ENCRE;
+    g.fillRect(X(-l / 2) - ep, Y(-p / 2) - ep, l * ech + 2 * ep, ep); g.fillRect(X(-l / 2) - ep, Y(p / 2), l * ech + 2 * ep, ep);
+    g.fillRect(X(-l / 2) - ep, Y(-p / 2), ep, p * ech); g.fillRect(X(l / 2), Y(-p / 2), ep, p * ech);
+    // repère d'un objet : centre, axes (u le long du mur, v vers la pièce)
+    const axes = o => { const c = Math.cos(o.rot), s2 = Math.sin(o.rot); return { u: [c, -s2], v: [s2, c] }; };
+    const coin = (o, a, b) => { const { u, v } = axes(o); return [X(o.x + u[0] * a + v[0] * b), Y(o.z + u[1] * a + v[1] * b)]; };
+    const rect = (o, w, d, remplir, trait, tirets) => {
+      const pts = [coin(o, -w / 2, -d / 2), coin(o, w / 2, -d / 2), coin(o, w / 2, d / 2), coin(o, -w / 2, d / 2)];
+      g.beginPath(); pts.forEach(([a, b], i) => i ? g.lineTo(a, b) : g.moveTo(a, b)); g.closePath();
+      if (remplir) { g.fillStyle = remplir; g.fill(); }
+      g.setLineDash(tirets ? [10, 8] : []); g.lineWidth = 3; g.strokeStyle = trait; g.stroke(); g.setLineDash([]);
+      return pts;
+    };
+    const texte = (t, x, y, taille = 26, coul = ENCRE, poids = 600) => { g.font = `${poids} ${taille}px Inter, Arial, sans-serif`; g.fillStyle = coul; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(t, x, y); };
+    const ordre = [...etat.objets].sort((a, b) => (EN_HAUTEUR.includes(a.type) ? 1 : 0) - (EN_HAUTEUR.includes(b.type) ? 1 : 0));
+    ordre.forEach(o => {
+      const c = CAT[o.type]; if (!c) return;
+      const cx = X(o.x), cy = Y(o.z);
+      if (o.type === "porte" || o.type === "fenetre") {
+        const k = murDe(o.rot), le = o.w * ech, horiz = k === 0 || k === 2;
+        // ouverture dans le mur
+        g.fillStyle = "#fff";
+        if (horiz) g.fillRect(cx - le / 2, (k === 0 ? Y(-p / 2) - ep : Y(p / 2)) - 1, le, ep + 2); else g.fillRect((k === 3 ? X(-l / 2) - ep : X(l / 2)) - 1, cy - le / 2, ep + 2, le);
+        g.strokeStyle = ENCRE; g.lineWidth = 3;
+        if (o.type === "fenetre") {
+          g.beginPath();
+          if (horiz) { const y0 = k === 0 ? Y(-p / 2) - ep : Y(p / 2); [y0 + ep * .35, y0 + ep * .65].forEach(y => { g.moveTo(cx - le / 2, y); g.lineTo(cx + le / 2, y); }); }
+          else { const x0 = k === 3 ? X(-l / 2) - ep : X(l / 2); [x0 + ep * .35, x0 + ep * .65].forEach(x => { g.moveTo(x, cy - le / 2); g.lineTo(x, cy + le / 2); }); }
+          g.stroke();
+          const [tx, ty] = coin(o, 0, .22); texte(`Fenêtre ${Math.round(o.w * 100)}`, tx, ty, 22, GRIS, 500);
+        } else if (o.ouverture === "Coulissante") {
+          const [a1, b1] = coin(o, -o.w / 2, .06), [a2, b2] = coin(o, o.w / 2 * .9, .06);
+          g.lineWidth = 6; g.beginPath(); g.moveTo(a1, b1); g.lineTo(a2, b2); g.stroke();
+          const [tx, ty] = coin(o, 0, .25); texte(`Porte coulissante ${Math.round(o.w * 100)}`, tx, ty, 22, GRIS, 500);
+        } else {
+          const [hx, hy] = coin(o, -o.w / 2, 0), [fx, fy] = coin(o, -o.w / 2, o.w), [ex, ey] = coin(o, o.w / 2, 0);
+          g.lineWidth = 3; g.beginPath(); g.moveTo(hx, hy); g.lineTo(fx, fy); g.stroke();
+          const a0 = Math.atan2(fy - hy, fx - hx), a1 = Math.atan2(ey - hy, ex - hx);
+          g.setLineDash([8, 6]); g.lineWidth = 2; g.beginPath(); g.arc(hx, hy, o.w * ech, Math.min(a0, a1), Math.max(a0, a1)); if (Math.abs(a0 - a1) > Math.PI) { g.beginPath(); g.arc(hx, hy, o.w * ech, Math.max(a0, a1), Math.min(a0, a1) + TAU); } g.stroke(); g.setLineDash([]);
+          const [tx, ty] = coin(o, 0, o.w * .55); texte(`Porte ${Math.round(o.w * 100)}`, tx, ty, 22, GRIS, 500);
+        }
+        return;
+      }
+      if (c.groupe === "Réseaux") {
+        const [mx, my] = coin(o, 0, .07), sym = { arrivees: ["EC/EF", "#c0392b"], evacuation: ["EV", "#7f8c8d"], prise: ["PC", "#d68910"], interrupteur: ["I", "#d68910"], vmc: ["VMC", "#5d6d7e"], spot: ["", "#d4ac0d"] }[o.type] || ["", GRIS];
+        g.beginPath(); g.arc(c.pose === "plafond" ? cx : mx, c.pose === "plafond" ? cy : my, o.type === "spot" ? 12 : 16, 0, TAU); g.fillStyle = sym[1]; g.fill();
+        if (sym[0]) texte(sym[0], (c.pose === "plafond" ? cx : mx), (c.pose === "plafond" ? cy : my) + 30, 18, sym[1], 700);
+        return;
+      }
+      const haut = EN_HAUTEUR.includes(o.type);
+      rect(o, o.w, o.d, haut ? null : (o.type === "douche" ? "#e3edf0" : "#ffffff"), haut ? GRIS : ENCRE, haut);
+      if (o.type === "douche") { // pente vers l'évacuation
+        g.strokeStyle = "#9fb7bf"; g.lineWidth = 2; const pts = [coin(o, -o.w / 2, -o.d / 2), coin(o, o.w / 2, -o.d / 2), coin(o, o.w / 2, o.d / 2), coin(o, -o.w / 2, o.d / 2)];
+        g.beginPath(); g.moveTo(...pts[0]); g.lineTo(...pts[2]); g.moveTo(...pts[1]); g.lineTo(...pts[3]); g.stroke();
+      }
+      if (Math.min(o.w, o.d) < .25) { // élément fin : étiquette posée devant, dans la pièce
+        const [tx, ty] = haut ? coin(o, 0, -o.d / 2 - .15) : coin(o, 0, o.d / 2 + .14); // en hauteur : écrit derrière le mur
+        texte(`${COURT[o.type] || c.nom} ${Math.round(o.w * 100)}`, tx, ty, 18, GRIS, 600);
+      } else {
+        const taille = Math.max(15, Math.min(26, Math.min(o.w, o.d) * ech / 3.2));
+        texte(COURT[o.type] || c.nom, cx, cy - taille * .6, taille, haut ? GRIS : ENCRE);
+        texte(`${Math.round(o.w * 100)} × ${Math.round(o.d * 100)}`, cx, cy + taille * .7, taille * .8, GRIS, 500);
+      }
+    });
+    // cotes générales
+    g.strokeStyle = ENCRE; g.fillStyle = ENCRE; g.lineWidth = 2;
+    const fleche = (x1, y1, x2, y2) => { g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke(); [[x1, y1, x2, y2], [x2, y2, x1, y1]].forEach(([a, b, c2, d]) => { const an = Math.atan2(d - b, c2 - a); g.beginPath(); g.moveTo(a, b); g.lineTo(a + 16 * Math.cos(an + .35), b + 16 * Math.sin(an + .35)); g.lineTo(a + 16 * Math.cos(an - .35), b + 16 * Math.sin(an - .35)); g.closePath(); g.fill(); }); };
+    const yh = Y(-p / 2) - ep - 50; fleche(X(-l / 2), yh, X(l / 2), yh); texte(`${Math.round(l * 100)} cm`, (X(-l / 2) + X(l / 2)) / 2, yh - 24, 30);
+    const xg = X(-l / 2) - ep - 50; fleche(xg, Y(-p / 2), xg, Y(p / 2));
+    g.save(); g.translate(xg - 26, (Y(-p / 2) + Y(p / 2)) / 2); g.rotate(-Math.PI / 2); texte(`${Math.round(p * 100)} cm`, 0, 0, 30); g.restore();
+    // cartouche
+    const yb = Hc - 70; g.fillStyle = "#c8141a"; g.fillRect(marge, yb - 34, 60, 3);
+    g.textAlign = "left"; g.textBaseline = "middle"; g.fillStyle = ENCRE; g.font = "600 28px Inter, Arial, sans-serif";
+    g.fillText(`KA Rénovation · ${etat.nom}${client ? " · " + nomClient(client) : ""}`, marge, yb);
+    g.font = "500 22px Inter, Arial, sans-serif"; g.fillStyle = GRIS;
+    g.fillText(`Surface ${String(Math.round(l * p * 100) / 100).replace(".", ",")} m² · hauteur ${Math.round(etat.dims.h * 100)} cm · ${new Date().toLocaleDateString("fr-FR")} · cotes en cm, plan indicatif`, marge, yb + 34);
+  }
+  document.getElementById("plan2d").onclick = () => {
+    const v = document.createElement("div"); v.className = "voile";
+    v.innerHTML = `<div class="fenetre" role="dialog" aria-modal="true" style="max-width:900px"><div class="tete"><h2>Plan 2D</h2><button class="icone" data-fermer aria-label="Fermer">✕</button></div>
+      <canvas id="planCanvas" style="width:100%;height:auto;border:1px solid var(--sable);border-radius:12px;display:block"></canvas>
+      <p class="gris" style="font-size:13px;margin:10px 0 14px">Traits pleins : au sol · pointillés : fixé au mur en hauteur (miroir, meuble haut…) · EC/EF arrivées d'eau, EV évacuation, PC prise.</p>
+      <div class="actions-doc" style="margin:0"><button class="btn" id="planTelecharger">Télécharger le plan</button></div></div>`;
+    document.body.appendChild(v);
+    const cv = v.querySelector("#planCanvas"); dessinerPlan(cv);
+    v.addEventListener("click", e => { if (e.target === v || e.target.closest("[data-fermer]")) v.remove(); });
+    v.querySelector("#planTelecharger").onclick = async () => {
+      const blob = await new Promise(ok => cv.toBlob(ok, "image/png"));
+      const fichier = new File([blob], `plan-${(client?.nom || "salle-de-bain").toLowerCase()}.png`, { type: "image/png" });
+      if (navigator.canShare && navigator.canShare({ files: [fichier] })) { try { await navigator.share({ files: [fichier] }); return; } catch (er) { if (er.name === "AbortError") return; } }
+      const a = document.createElement("a"); a.href = URL.createObjectURL(fichier); a.download = fichier.name; a.click();
+    };
+  };
+
   /* --- ChatGPT (en option, avec le compte de l'artisan) : on prépare le texte et l'image, il colle et envoie --- */
   const metres = v => String(Math.round(v * 100) / 100).replace(".", ",") + " m";
   const revetement = r => `${MATIERES[r.matiere].nom.toLowerCase()}, format ${FORMATS[r.format].nom}, joints ${({ blanc: "blancs", gris: "gris", noir: "noirs" })[r.joint]}`;
