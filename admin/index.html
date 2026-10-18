@@ -119,6 +119,16 @@
   .note-carnet { position: relative; background: #fff; border-radius: 12px; padding: 10px 40px 10px 12px; margin-top: 8px; }
   .note-carnet small { color: var(--gris); font-size: 12px; }
   .note-carnet .icone { position: absolute; top: 6px; right: 6px; }
+  .resume-carnet { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
+  .resume-carnet button { background: #fff; border: 1px solid var(--sable); border-radius: 12px; padding: 10px; text-align: left; font: inherit; font-size: 12px; color: var(--gris); cursor: pointer; }
+  .resume-carnet b { display: block; font-family: var(--serif); font-weight: 400; font-size: 20px; color: var(--encre); }
+  .note-carnet.imprevu { border-left: 4px solid #c8141a; }
+  .note-carnet.depense p b { font-family: var(--serif); font-weight: 400; font-size: 18px; }
+  .note-carnet.tache label { display: flex; gap: 10px; align-items: flex-start; text-transform: none; letter-spacing: 0; font-size: 15px; font-weight: 400; color: var(--encre); margin: 0; }
+  .note-carnet.tache input { width: 22px; height: 22px; flex: none; accent-color: var(--encre); }
+  .note-carnet.faite span { text-decoration: line-through; color: var(--gris); }
+  .lien-ticket { background: none; border: 0; padding: 0; color: var(--gris); text-decoration: underline; font: inherit; font-size: 13px; cursor: pointer; }
+  .vignette em { position: absolute; left: 6px; right: 6px; top: 6px; background: rgba(255,255,255,.88); color: var(--encre); font-style: normal; font-size: 11px; padding: 2px 7px; border-radius: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .detail-ligne { font-size: 13px; color: var(--gris); margin-top: 6px; }
   .actions-doc { display: flex; gap: 8px; flex-wrap: wrap; margin: 18px 0; }
 
