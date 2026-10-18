@@ -431,11 +431,11 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
       { type: "wc", x: -1.1, z: .35, rot: Math.PI / 2 }, { type: "porte", x: 1.3, z: .45, rot: -Math.PI / 2 }, { type: "radiateur", x: -1.3, z: .8, rot: Math.PI / 2 }, { type: "prise", x: -.1, z: -1, rot: 0 }
     ]
   });
-  let etat = defaut(), simId = null, client = null, selection = null, chantier = false;
+  let validation = {}, etat = defaut(), simId = null, client = null, selection = null, chantier = false;
   etat.robinetterie = "noir";
   if (params.get("sim")) {
     const s = await db.lire("simulations", params.get("sim"));
-    if (s) { etat = migrer({ ...defaut(), ...s.data }); simId = s.id; etat.nom = s.nom || etat.nom; if (s.client_id) client = await db.lire("clients", s.client_id); }
+    if (s) { etat = migrer({ ...defaut(), ...s.data }); simId = s.id; validation = { jeton: s.jeton, valide_le: s.valide_le, valide_nom: s.valide_nom }; etat.nom = s.nom || etat.nom; if (s.client_id) client = await db.lire("clients", s.client_id); }
   } else if (params.get("client")) client = await db.lire("clients", params.get("client"));
   etat.objets = etat.objets.filter(o => CAT[o.type]); etat.objets.forEach(completer);
 
@@ -474,7 +474,9 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
           <button class="btn discret" id="vueDessus">Vue de dessus</button>
           <button class="btn discret" id="modeChantier">Mode chantier</button>
           <button class="btn discret" id="aZero">Vider la salle de bain</button>
+          <button class="btn clair" id="validerClient">Faire valider les choix au client</button>
         </div>
+        <p class="gris" id="etatValidation" style="font-size:13px;margin:-8px 0 14px"></p>
         <div class="carte" id="metre"></div>
       </div>
       <div class="carte" id="reglages3d">
@@ -752,6 +754,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     requestAnimationFrame(boucle);
   }
   appliquerRobinetterie(etat.robinetterie); reconstruire(); boucle();
+  majValidation();
 
   /* --- Métré --- */
   function metre() {
@@ -1410,9 +1413,58 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
   };
   document.getElementById("clientSim").onclick = () => choisirClient(c => { client = c; document.getElementById("clientSim").textContent = nomClient(c); });
   document.getElementById("titreSim").onclick = () => { const n = prompt("Nom de la simulation", etat.nom); if (n) { etat.nom = n; document.getElementById("titreSim").textContent = n; } };
-  const enregistrer = async () => {
-    const s = await db.enregistrer("simulations", { ...(simId ? { id: simId } : {}), client_id: client?.id || null, nom: etat.nom, data: etat, image: image(480) });
-    simId = s.id; return s;
+  const enregistrer = async (extra = {}) => {
+    const s = await db.enregistrer("simulations", { ...(simId ? { id: simId } : {}), client_id: client?.id || null, nom: etat.nom, data: etat, image: image(900), ...extra });
+    simId = s.id; validation = { jeton: s.jeton, valide_le: s.valide_le, valide_nom: s.valide_nom }; majValidation(); return s;
+  };
+
+  /* --- Le client valide ses choix par un lien secret --- */
+  function choixClient() {
+    const rev = r => `${MATIERES[r.matiere]?.nom || ""}, ${FORMATS[r.format]?.nom || ""}, joints ${({ blanc: "blancs", gris: "gris", noir: "noirs" })[r.joint] || ""}`;
+    const l = [{ titre: "Carrelage des murs", valeur: rev(etat.murs), couleur: MATIERES[etat.murs.matiere]?.couleur }];
+    if (etat.accent.actif && Object.keys(zonesDouche()).length) l.push({ titre: "Murs de la douche", valeur: rev(etat.accent), couleur: MATIERES[etat.accent.matiere]?.couleur });
+    l.push({ titre: "Sol", valeur: rev(etat.sol), couleur: MATIERES[etat.sol.matiere]?.couleur });
+    if (metre().peinture > .5) l.push({ titre: "Peinture des murs", valeur: PEINTURES[etat.peinture] || "", couleur: etat.peinture });
+    if (etat.fauxPlafond) l.push({ titre: "Plafond", valeur: "Faux plafond lisse, peint en blanc mat", couleur: "#ffffff" });
+    const rob = ROBINETTERIE[etat.robinetterie];
+    l.push({ titre: "Robinetterie et poignées", valeur: rob?.nom || "", couleur: rob?.couleur });
+    // tous les éléments ajoutés, les identiques regroupés (« × 2 »)
+    const vus = new Map();
+    etat.objets.forEach(o => {
+      const c = CAT[o.type], grand = ["Sanitaires", "Meubles"].includes(c.groupe);
+      const opts = Object.keys(c.options || {}).filter(k => k !== "finition").map(k => k === "receveur" ? "receveur " + String(o[k]).toLowerCase() : o[k]).filter(Boolean);
+      const valeur = [grand || c.groupe === "Ouvertures" ? `${cm(o.w)} × ${cm(c.groupe === "Ouvertures" ? o.h : o.d)} cm` : "", o.finition ? BOIS[o.finition] : "", ...opts].filter(Boolean).join(", ");
+      const cle = c.nom + "|" + valeur;
+      if (vus.has(cle)) vus.get(cle).n++; else vus.set(cle, { n: 1, titre: c.nom, valeur, couleur: o.finition || null });
+    });
+    vus.forEach(v => { const nom = v.n > 1 ? `${v.titre} × ${v.n}` : v.titre;
+      l.push(v.valeur ? { titre: nom, valeur: v.valeur, couleur: v.couleur } : { titre: "Équipement", valeur: nom, couleur: null }); });
+    return l;
+  }
+  const lienChoix = j => location.origin + location.pathname.replace(/admin\/.*$/, "") + "choix/?c=" + j;
+  function majValidation() {
+    const p = document.getElementById("etatValidation"); if (!p) return;
+    const q = validation.valide_le ? new Date(validation.valide_le) : null;
+    p.innerHTML = q ? `<b style="color:#2f6f4f">✓ Choix validés par ${esc(validation.valide_nom)} le ${q.toLocaleDateString("fr-FR")}</b>`
+      : etat.choix && validation.jeton ? "Lien envoyé : en attente de la validation du client." : "";
+  }
+  document.getElementById("validerClient").onclick = async () => {
+    try {
+      if (!client && !confirm("Aucun client n'est associé à cette simulation. Continuer quand même ?")) return;
+      etat.choix = choixClient();
+      const s = await enregistrer({ valide_le: null, valide_nom: null, ...(simId && validation.jeton ? {} : { jeton: crypto.randomUUID() }) });
+      const lien = lienChoix(s.jeton);
+      const texte = `Bonjour,
+
+Voici la simulation de votre future salle de bain avec les choix dont nous avons parlé. Vous pouvez les revoir et les valider ici :
+${lien}
+
+Un détail ne vous convient pas ? Appelez-moi avant de valider.
+KA Rénovation — 07 63 14 76 27`;
+      if (navigator.share) { try { await navigator.share({ text: texte }); return; } catch (er) { if (er.name === "AbortError") return; } }
+      try { await navigator.clipboard.writeText(texte); } catch { const t = document.createElement("textarea"); t.value = texte; document.body.appendChild(t); t.select(); document.execCommand("copy"); t.remove(); }
+      toast("Message copié ✓ : collez-le dans WhatsApp ou un SMS");
+    } catch (er) { toast("Erreur : " + er.message); }
   };
   document.getElementById("enregSim").onclick = async () => { try { await enregistrer(); toast("Simulation enregistrée ✓"); } catch (er) { toast("Erreur : " + er.message); } };
 
