@@ -855,6 +855,19 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
       ajoute("Bande à joint", `${n(placo * 1.5)} m`, "");
       ajoute("Enduit à joint", `${pl(Math.max(1, Math.ceil(placo * .35 / 5)), "sac")} de 5 kg`, `≈ ${n(placo * .35)} kg`);
     }
+    // électricité : pour chaque point, une boîte, du fil sous gaine et des connecteurs
+    const nb = t => etat.objets.filter(o => t.includes(o.type)).length;
+    const pPrise = nb(["prise"]), pEclairage = nb(["interrupteur", "spot", "miroir", "miroirRect", "armoire"]), pRad = nb(["radiateur"]), pVmc = nb(["vmc"]);
+    const points = pPrise + pEclairage + pRad + pVmc;
+    if (points) {
+      ajoute("Boîtes d'encastrement", pl(nb(["prise", "interrupteur"]) + pRad + nb(["miroir", "miroirRect", "armoire"]), "boîte"), "prises, interrupteurs, sorties de câble");
+      if (nb(["spot"])) ajoute("Boîtes pour spots (cloches)", pl(nb(["spot"]), "boîte"), "faux plafond ou plafond");
+      const m25 = (pPrise + pRad) * 8, m15 = (pEclairage + pVmc) * 6;
+      if (m25) ajoute("Fil 2,5 mm² (H07V-U)", `${m25 * 3} m`, "phase, neutre, terre ; prises et sèche-serviettes");
+      if (m15) ajoute("Fil 1,5 mm² (H07V-U)", `${m15 * 3} m`, "phase, neutre, terre ; éclairage et VMC");
+      ajoute("Gaine ICTA Ø 20", `${m25 + m15} m`, "");
+      ajoute("Connecteurs rapides (type Wago)", pl(points * 3, "connecteur"), "");
+    }
     ajoute("Silicone sanitaire", pl(douche ? 2 : 1, "cartouche"), "joints autour des sanitaires");
     return liste;
   }
@@ -1447,9 +1460,11 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     if (m.peinture > .5) a.push({ titre: "Peinture des murs", valeur: `${PEINTURES[etat.peinture] || ""}, pièce humide`, quantite: `${litres(m.peinture)} L`, detail: `${f(m.peinture)} m², 2 couches` });
     a.push({ titre: "Peinture du plafond", valeur: "Blanc mat, pièce humide", quantite: `${litres(l * p)} L`, detail: `${f(l * p)} m², 2 couches` });
     const vus = new Map();
-    etat.objets.filter(o => ["Sanitaires", "Meubles"].includes(CAT[o.type].groupe)).forEach(o => vus.set(o.type, (vus.get(o.type) || 0) + 1));
+    etat.objets.filter(o => ["Sanitaires", "Meubles", "Équipements"].includes(CAT[o.type].groupe)).forEach(o => vus.set(o.type, (vus.get(o.type) || 0) + 1));
     vus.forEach((n, t) => a.push({ titre: CAT[t].nom, valeur: "Voir le détail dans vos choix", quantite: String(n) }));
     a.push({ titre: "Robinetterie", valeur: ROBINETTERIE[etat.robinetterie]?.nom || "", quantite: "" });
+    const elec = { prise: "Prises électriques", interrupteur: "Interrupteurs", spot: "Spots LED (IP65 en salle de bain)", vmc: "Bouche VMC" };
+    Object.entries(elec).forEach(([t, nom]) => { const n = etat.objets.filter(o => o.type === t).length; if (n) a.push({ titre: nom, valeur: "Électricité", quantite: String(n) }); });
     return a;
   }
   const lienChoix = j => location.origin + location.pathname.replace(/admin\/.*$/, "") + "choix/?c=" + j;
