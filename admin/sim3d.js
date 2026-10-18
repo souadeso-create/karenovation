@@ -1105,13 +1105,13 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     const cote = camera.position.x > 0 ? "gauche" : "droite", face = camera.position.z > 0 ? "du fond" : "de devant";
     // angle de la 3D au moment où l'on prépare le texte : de face ou de trois quarts
     const cx = camera.position.x - controles.target.x, cz = camera.position.z - controles.target.z;
-    const vue = Math.abs(cx) < Math.abs(cz) * .35 ? `de face, face au mur ${cz > 0 ? "du fond" : "de devant"}`
-      : Math.abs(cz) < Math.abs(cx) * .35 ? `de face, face au mur de ${cx > 0 ? "gauche" : "droite"}`
+    const vue = Math.abs(cx) < Math.abs(cz) * .18 ? `de face, face au mur ${cz > 0 ? "du fond" : "de devant"}`
+      : Math.abs(cz) < Math.abs(cx) * .18 ? `de face, face au mur de ${cx > 0 ? "gauche" : "droite"}`
       : `de trois quarts, en diagonale, depuis l'angle ${cz > 0 ? "devant" : "fond"}-${cx > 0 ? "droite" : "gauche"} de la pièce vers l'angle ${cz > 0 ? "fond" : "devant"}-${cx > 0 ? "gauche" : "droite"}`;
     return [
       photo
         ? "Rénovation de salle de bain : à partir de la photo jointe (la pièce actuelle de mon client), crée la photo de cette même pièce une fois rénovée."
-        : "Rénovation de salle de bain : crée la vraie photo de cette salle de bain une fois les travaux finis. L'image 3D jointe sert seulement de plan d'aménagement (où va chaque élément, quelles couleurs) : ce n'est pas le rendu attendu.",
+        : "Rénovation de salle de bain : transforme l'image 3D jointe en vraie photo de la salle de bain une fois les travaux finis. Garde exactement sa composition, son angle et la place de chaque élément ; remplace seulement l'aspect maquette 3D par un rendu photo réaliste.",
       "",
       "STYLE PHOTO",
       "- Photographie d'architecture d'intérieur professionnelle, qualité magazine de décoration.",
