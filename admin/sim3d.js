@@ -185,7 +185,7 @@ function tube(a, b, r, m) {
    Chaque modèle est dessiné centré en x, dos vers z- , posé au sol (y = 0).
    pose : "sol", "mur" (contre le mur le plus proche), "dansMur" (porte, fenêtre, réseaux : caché avec son mur), "plafond". */
 const CAT = {
-  decroche: { nom: "Décroché (gaine, coffrage)", groupe: "Structure", pose: "sol", dims: [40, 30, 250], tailles: [[30, 30], [40, 30], [60, 20], [100, 60], [120, 90]],
+  decroche: { nom: "Décroché (gaine, coffrage)", groupe: "Structure", pose: "sol", dims: [40, 30, 250], tailles: [[30, 30], [40, 30], [60, 20], [100, 60], [120, 90]], options: { travaux: ["Existant", "À créer (coffrage)"] },
     faire(w, d) { // du sol au plafond, habillé comme les murs (gaine, poteau, coffrage, retour de mur pour une pièce en L)
       const g = new THREE.Group(), h = AMBIANCE.h, hf = AMBIANCE.faience === "plafond" ? h : AMBIANCE.faience === "120" ? 1.2 : 0;
       const peint = new THREE.MeshStandardMaterial({ color: new THREE.Color(AMBIANCE.peinture), roughness: .9 });
@@ -449,6 +449,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
             <div class="champ"><label>Plafond</label><select id="penteMur">${["aucun", "gauche", "droite", "fond", "devant"].map(m => `<option value="${m}" ${(etat.pente?.mur || "aucun") === m ? "selected" : ""}>${m === "aucun" ? "Plat" : "Sous pente, côté " + m}</option>`).join("")}</select></div>
             <div class="champ"><label>Pente : hauteur basse cm</label><input type="number" id="penteBasse" value="${cm(etat.pente?.basse || 1)}" inputmode="numeric"></div>
             <div class="champ"><label>Largeur de la pente cm</label><input type="number" id="penteLarg" value="${cm(etat.pente?.largeur || 1.2)}" inputmode="numeric"></div>
+            <div class="champ"><label>Faux plafond</label><select id="fauxPlafond"><option value="0" ${!etat.fauxPlafond ? "selected" : ""}>Non</option><option value="1" ${etat.fauxPlafond ? "selected" : ""}>Oui, plaques hydrofuges</option></select></div>
             <div class="champ"><label>Dépose de l'existant</label><select id="depose"><option value="1" ${etat.depose ? "selected" : ""}>Oui</option><option value="0" ${!etat.depose ? "selected" : ""}>Non</option></select></div>
           </div>
           <label>Peinture (au-dessus de la faïence)</label><div class="palette">${Object.entries(PEINTURES).map(([c, n]) => `<button type="button" class="pastille ${c === etat.peinture ? "actif" : ""}" data-peinture="${c}" title="${n}" aria-label="${n}" style="background:${c}"></button>`).join("")}</div>
@@ -519,6 +520,18 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
       if (a + w / 2 < .15) a = -w / 2; if (w / 2 - b < .15) b = w / 2; // on va jusqu'à l'angle
       if (b - a > .05) z[i] = [a, b]; });
     return z;
+  }
+  // Coffrages (décrochés) : longueur des faces visibles et des faces collées à un mur
+  function coffrages() {
+    const { l, p } = etat.dims;
+    return etat.objets.filter(o => o.type === "decroche").map(o => {
+      const travers = murDe(o.rot) % 2 === 1, [ex, ez] = travers ? [o.d, o.w] : [o.w, o.d];
+      const x0 = o.x - ex / 2, x1 = o.x + ex / 2, z0 = o.z - ez / 2, z1 = o.z + ez / 2;
+      const faces = [[ex, z0 + p / 2], [ez, l / 2 - x1], [ex, p / 2 - z1], [ez, x0 + l / 2]];
+      const visible = faces.filter(([, e]) => e > .05).reduce((a, [w]) => a + w, 0);
+      const cache = faces.filter(([, e]) => e <= .05).reduce((a, [w]) => a + w, 0);
+      return { creer: o.travaux === "À créer (coffrage)", visible, cache, angles: Math.max(0, faces.filter(([, e]) => e > .05).length - 1) };
+    });
   }
   const hauteurFaience = h => etat.faience === "plafond" ? h : etat.faience === "120" ? 1.2 : 0;
 
@@ -704,10 +717,12 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     let murm2 = 0;
     largeurs.forEach(w => { murm2 += w * hf; });
     Object.values(zonesDouche()).forEach(([a, b]) => { murm2 += (b - a) * (h - hf); });
+    const net = coffrages().reduce((a, c) => a + c.visible - c.cache, 0); // un coffrage ajoute des faces à carreler / peindre
+    murm2 += net * hf;
     etat.objets.filter(o => o.type === "porte" || o.type === "fenetre").forEach(o => {
       murm2 -= o.w * Math.max(0, Math.min(o.y + o.h, hf) - o.y);
     });
-    const peint = 2 * (l + p) * h - murm2 - etat.objets.filter(o => o.type === "porte").reduce((a, o) => a + o.w * o.h, 0);
+    const peint = (2 * (l + p) + net) * h - murm2 - etat.objets.filter(o => o.type === "porte").reduce((a, o) => a + o.w * o.h, 0);
     return { sol: l * p, murs: Math.max(0, murm2), peinture: Math.max(0, peint), plafond: l * p };
   }
   // Carrelage à commander : surface posée + chutes (10 %, 15 % en pose décalée ou grand format), et nombre de carreaux.
@@ -771,9 +786,49 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
       const ml = 2 * (l + p) - portes - Object.values(zones).reduce((a, [x, y]) => a + (y - x), 0);
       if (ml > .05) ajoute("Plinthes", `${n(ml * 1.1)} m`, "10 % de chutes compris");
     }
+    // coffrages et faux plafond : plaques BA13 hydrofuges 120 × 250 (3 m²), ossature 48 mm en barres de 3 m
+    const cof = coffrages().filter(c => c.creer), dev = cof.reduce((a, c) => a + c.visible, 0);
+    const surfCof = dev * h, surfFP = etat.fauxPlafond ? l * p : 0, placo = surfCof + surfFP;
+    if (dev > .05) {
+      ajoute("Rails R48 (coffrage)", `${pl(Math.ceil(2 * dev * 1.1 / 3), "barre")} de 3 m`, `sol + plafond, ${n(2 * dev)} m`);
+      const mont = cof.reduce((a, c) => a + Math.ceil(c.visible / .6) + 1, 0) * Math.ceil(h / 3);
+      ajoute("Montants M48 (coffrage)", `${pl(mont, "barre")} de 3 m`, "un tous les 60 cm");
+      const ang = cof.reduce((a, c) => a + c.angles, 0);
+      if (ang) ajoute("Cornières d'angle", `${pl(ang * Math.ceil(h / 3), "barre")} de 3 m`, "angles saillants du coffrage");
+      ajoute("Laine minérale 45 mm", `${n(surfCof)} m²`, "isolation phonique des gaines");
+    }
+    if (surfFP) {
+      const rangs = Math.ceil(p / .6) + 1, ml = rangs * l;
+      ajoute("Fourrures F530 (faux plafond)", `${pl(Math.ceil(ml * 1.1 / 3), "barre")} de 3 m`, `entraxe 60 cm, ${n(ml)} m`);
+      ajoute("Suspentes", `${Math.ceil(ml / 1.2)}`, "une tous les 1,20 m de fourrure");
+      ajoute("Cornières de rive", `${pl(Math.ceil(2 * (l + p) * 1.1 / 3), "barre")} de 3 m`, `pourtour, ${n(2 * (l + p))} m`);
+    }
+    if (placo > .05) {
+      ajoute("Plaques BA13 hydrofuges (H1)", `${pl(Math.ceil(placo * 1.1 / 3), "plaque")} de 120 × 250`, `${n(placo)} m² + 10 %`);
+      ajoute("Vis TTPC 25", `${Math.ceil(placo * 25 / 100) * 100} vis`, "≈ 25 par m²");
+      ajoute("Bande à joint", `${n(placo * 1.5)} m`, "");
+      ajoute("Enduit à joint", `${pl(Math.max(1, Math.ceil(placo * .35 / 5)), "sac")} de 5 kg`, `≈ ${n(placo * .35)} kg`);
+    }
     ajoute("Silicone sanitaire", pl(douche ? 2 : 1, "cartouche"), "joints autour des sanitaires");
     return liste;
   }
+  // Texte de commande prêt à envoyer (WhatsApp, SMS, mail) au fournisseur
+  function texteCommande() {
+    const f = v => (Math.ceil(v * 10) / 10).toLocaleString("fr-FR");
+    return ["Bonjour,", "", "Voici ma commande pour un chantier de salle de bain :", "",
+      "CARRELAGE",
+      ...carrelageACommander().map(c => `- ${c.titre} : ${c.matiere}, ${c.format} — ${f(c.total)} m²${c.n ? ` (≈ ${c.n.toLocaleString("fr-FR")} ${c.unite})` : ""}`),
+      "", "FOURNITURES",
+      ...fournitures().map(x => `- ${x.nom} : ${x.qte}`),
+      "", "Merci de me confirmer la disponibilité et le délai.", "KA Rénovation — 07 63 14 76 27"].join("\n");
+  }
+  document.getElementById("metre").addEventListener("click", async e => {
+    const b = e.target.closest("[data-commande]"); if (!b) return;
+    const texte = texteCommande();
+    if (b.dataset.commande === "envoyer" && navigator.share) { try { await navigator.share({ text: texte }); return; } catch (er) { if (er.name === "AbortError") return; } }
+    try { await navigator.clipboard.writeText(texte); } catch { const t = document.createElement("textarea"); t.value = texte; document.body.appendChild(t); t.select(); document.execCommand("copy"); t.remove(); }
+    toast("Commande copiée ✓ : collez-la dans WhatsApp ou un mail");
+  });
   function majMetre() {
     const m = metre(), f = n => n.toLocaleString("fr-FR", { maximumFractionDigits: 1 });
     const ouvert = document.querySelector("#metre .deroule-carrelage")?.open, cmd = carrelageACommander();
@@ -790,7 +845,8 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
       ${fourn.map(x => `<div style="display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--sable)">
         <div><b style="font-weight:600">${esc(x.nom)}</b>${x.detail ? `<br><span class="gris" style="font-size:13px">${esc(x.detail)}</span>` : ""}</div>
         <div style="text-align:right;white-space:nowrap;font-weight:600">${esc(x.qte)}</div></div>`).join("")}
-      <p class="gris" style="font-size:12px;margin-top:6px">Quantités courantes de pose : vérifiez la fiche du produit choisi.</p></details>`;
+      <p class="gris" style="font-size:12px;margin-top:6px">Quantités courantes de pose : vérifiez la fiche du produit choisi.</p></details>
+      <div class="actions-doc" style="margin:12px 0 0"><button type="button" class="btn clair petit-btn" data-commande="envoyer">Envoyer la commande au fournisseur</button><button type="button" class="btn discret petit-btn" data-commande="copier">Copier</button></div>`;
   }
 
   /* --- Sélection, déplacement au doigt --- */
@@ -820,7 +876,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     glisse = false; controles.enabled = true;
   });
 
-  const LIBELLES = { receveur: "Receveur", diametre: "Diamètre", ouverture: "Ouverture", couleur: "Couleur", modele: "Modèle", style: "Pose", facade: "Façade" };
+  const LIBELLES = { travaux: "Travaux", receveur: "Receveur", diametre: "Diamètre", ouverture: "Ouverture", couleur: "Couleur", modele: "Modèle", style: "Pose", facade: "Façade" };
   const champsObjet = (o, c) => `
       ${c.tailles ? `<label>Tailles courantes</label><div class="palette" style="margin-bottom:12px">${c.tailles.map(([w, d]) => `<button type="button" class="btn ${cm(o.w) === w && cm(o.d) === d ? "" : "discret"} petit-btn" data-taille="${w}x${d}">${w} × ${d}</button>`).join("")}</div>` : ""}
       <div class="trois">
@@ -901,6 +957,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     else if (t.dataset.joint) etat[t.dataset.joint].joint = t.value;
     else if (t.id === "faience") etat.faience = t.value;
     else if (t.id === "depose") etat.depose = t.value === "1";
+    else if (t.id === "fauxPlafond") { etat.fauxPlafond = t.value === "1"; majMetre(); return; }
     else if (t.id === "accentActif") etat.accent.actif = t.checked;
     else if (t.id === "penteMur" || t.id === "penteBasse" || t.id === "penteLarg") {
       etat.pente = { mur: panneau.querySelector("#penteMur").value, basse: Math.max(.5, (Number(panneau.querySelector("#penteBasse").value) || 100) / 100),
@@ -1212,7 +1269,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     const { l, p, h } = etat.dims;
     const equipements = etat.objets.filter(o => CAT[o.type].groupe !== "Réseaux").map(o => {
       const c = CAT[o.type], w = o.w ?? c.dims[0] / 100, d = o.d ?? c.dims[1] / 100;
-      const opts = Object.keys(c.options || {}).map(k => k === "finition" ? (BOIS[o[k]] || "").toLowerCase()
+      const opts = Object.keys(c.options || {}).filter(k => k !== "travaux").map(k => k === "finition" ? (BOIS[o[k]] || "").toLowerCase()
         : o[k] === "Comme la robinetterie" ? (ROBINETTERIE[etat.robinetterie]?.nom || "").toLowerCase()
         : o[k] ? (k === "receveur" ? "receveur " : "") + o[k].toLowerCase() : "").filter(Boolean);
       const taille = c.tailles && ["Sanitaires", "Meubles"].includes(c.groupe) ? ` (${Math.round(w * 100)} × ${Math.round(d * 100)} cm)` : "";
@@ -1252,6 +1309,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
       `- Carrelage mural ${faience} : ${revetement(etat.murs)}.`,
       etat.accent.actif ? `- Murs de la douche (seulement la zone de douche, ${Object.keys(zonesDouche()).length > 1 ? "sur les deux murs de l'angle" : "sur le mur du fond de la douche"}, jusqu'au plafond) : ${revetement(etat.accent)}.` : null,
       `- Sol : ${revetement(etat.sol)}.`,
+      etat.fauxPlafond ? "- Plafond : faux plafond lisse, peint en blanc mat." : null,
       etat.faience !== "plafond" ? `- Peinture au-dessus du carrelage : ${(PEINTURES[etat.peinture] || "").toLowerCase()}, finition mate.` : null,
       `- Robinetterie et poignées : ${(ROBINETTERIE[etat.robinetterie]?.nom || "").toLowerCase()}. Les autres éléments gardent leur couleur indiquée ci-dessous.`,
       etat.pente && etat.pente.mur !== "aucun" ? `- Plafond sous pente (combles) côté mur ${etat.pente.mur === "fond" ? "du fond" : etat.pente.mur === "devant" ? "de devant" : "de " + etat.pente.mur} : ${Math.round(etat.pente.basse * 100)} cm de haut contre ce mur, pleine hauteur à ${Math.round(etat.pente.largeur * 100)} cm.` : null,
