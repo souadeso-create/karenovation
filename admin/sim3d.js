@@ -51,6 +51,31 @@ const MATIERES = {
     for (let i = 0; i < w * h / 600; i++) { g.fillStyle = ["#f1eee8", "#a39d94", "#c9a98a", "#6f6a64"][i % 4]; g.beginPath(); g.ellipse(Math.random() * w, Math.random() * h, 1.5 + Math.random() * 4, 1.5 + Math.random() * 3, Math.random() * 3, 0, TAU); g.fill(); } } },
   cimentNoir: { nom: "Ciment noir et blanc", couleur: "#1f1f21", dessin: (g, w, h) => motifCiment(g, w, h, "#efebe3", "#1f1f21") },
   cimentTerracotta: { nom: "Ciment terracotta", couleur: "#b8684a", dessin: (g, w, h) => motifCiment(g, w, h, "#efe6da", "#b8684a") },
+  marbreGris: { nom: "Marbre gris", couleur: "#c9c9cb", dessin: (g, w, h) => { uni(g, w, h, 220, 4, 78, .02); veines(g, w, h, "rgba(90,90,95,.45)", 4); } },
+  onyx: { nom: "Onyx miel", couleur: "#d9a865", dessin: (g, w, h) => { uni(g, w, h, 36, 55, 66, .03); veines(g, w, h, "rgba(255,240,210,.5)", 5); } },
+  travertinGris: { nom: "Travertin gris", couleur: "#9e9890", dessin: (g, w, h) => { uni(g, w, h, 30, 6, 60, .07); veines(g, w, h, "rgba(70,65,60,.18)", 3); } },
+  pierreBleue: { nom: "Pierre bleue", couleur: "#525a63", dessin: (g, w, h) => uni(g, w, h, 210, 10, 36, .1) },
+  pierreNoire: { nom: "Pierre noire", couleur: "#2a2a2a", dessin: (g, w, h) => uni(g, w, h, 30, 3, 17, .12) },
+  grisPerle: { nom: "Gris perle", couleur: "#dadcdf", dessin: (g, w, h) => uni(g, w, h, 220, 6, 86, .02) },
+  grisCiment: { nom: "Gris ciment", couleur: "#b2afa9", dessin: (g, w, h) => uni(g, w, h, 40, 4, 70, .08) },
+  betonCire: { nom: "Effet béton ciré", couleur: "#bdb7ae", dessin: (g, w, h) => uni(g, w, h, 35, 6, 72, .14) },
+  lin: { nom: "Lin", couleur: "#e2d8c6", dessin: (g, w, h) => uni(g, w, h, 36, 25, 84, .03) },
+  lavande: { nom: "Lavande", couleur: "#c6c0d8", dessin: (g, w, h) => uni(g, w, h, 255, 20, 80, .03) },
+  corail: { nom: "Corail", couleur: "#e39a87", dessin: (g, w, h) => uni(g, w, h, 10, 60, 71, .04) },
+  ocre: { nom: "Ocre", couleur: "#c9883e", dessin: (g, w, h) => uni(g, w, h, 32, 56, 52, .05) },
+  bordeaux: { nom: "Bordeaux", couleur: "#6b2a35", dessin: (g, w, h) => uni(g, w, h, 350, 44, 29, .05) },
+  emeraude: { nom: "Vert émeraude", couleur: "#1f6b52", dessin: (g, w, h) => uni(g, w, h, 158, 55, 27, .05) },
+  bleuCanard: { nom: "Bleu canard", couleur: "#1e5f6b", dessin: (g, w, h) => uni(g, w, h, 189, 56, 27, .05) },
+  bleuKlein: { nom: "Bleu roi", couleur: "#27408b", dessin: (g, w, h) => uni(g, w, h, 225, 56, 35, .04) },
+  zelligeMoutarde: { nom: "Zellige moutarde", couleur: "#c99a3c", dessin: (g, w, h) => uni(g, w, h, 42, 58, 46 + Math.random() * 10, .08) },
+  zelligeTerracotta: { nom: "Zellige terracotta", couleur: "#b8684a", dessin: (g, w, h) => uni(g, w, h, 16, 48, 46 + Math.random() * 8, .08) },
+  zelligeGris: { nom: "Zellige gris", couleur: "#9a9894", dessin: (g, w, h) => uni(g, w, h, 40, 4, 58 + Math.random() * 10, .08) },
+  zelligeBeige: { nom: "Zellige beige", couleur: "#d8c6a8", dessin: (g, w, h) => uni(g, w, h, 36, 32, 74 + Math.random() * 8, .08) },
+  cimentVert: { nom: "Ciment vert", couleur: "#3f6b55", dessin: (g, w, h) => motifCiment(g, w, h, "#efebe3", "#3f6b55") },
+  cimentGris: { nom: "Ciment gris", couleur: "#8a8a88", dessin: (g, w, h) => motifCiment(g, w, h, "#efebe3", "#8a8a88") },
+  cimentRose: { nom: "Ciment rose", couleur: "#d9a3a0", dessin: (g, w, h) => motifCiment(g, w, h, "#f3ece4", "#d9a3a0") },
+  boisGris: { nom: "Bois grisé", couleur: "#a39a8f", dessin: (g, w, h) => bois(g, w, h, 30, 8, 60) },
+  boisMiel: { nom: "Chêne miel", couleur: "#c4914f", dessin: (g, w, h) => bois(g, w, h, 32, 55, 55) },
   boisClair: { nom: "Bois clair", couleur: "#d9c3a0", dessin: (g, w, h) => bois(g, w, h, 34, 36, 70) },
   bois: { nom: "Chêne", couleur: "#b58a5c", dessin: (g, w, h) => bois(g, w, h, 30, 45, 50) },
   noyer: { nom: "Noyer", couleur: "#5b4636", dessin: (g, w, h) => bois(g, w, h, 25, 30, 28) }
@@ -91,6 +116,16 @@ const FORMATS = {
   "60x120": { nom: "60×120", t: [.6, 1.2] },
   "80x80": { nom: "80×80", t: [.8, .8] },
   "120x120": { nom: "120×120", t: [1.2, 1.2] },
+  "2.5x2.5": { nom: "Mosaïque 2,5×2,5", t: [.025, .025] },
+  "10x20": { nom: "10×20", t: [.2, .1] },
+  "6.5x20v": { nom: "Baguette verticale 6,5×20", t: [.065, .2] },
+  "20x40": { nom: "20×40", t: [.4, .2] },
+  "25x75": { nom: "25×75", t: [.75, .25] },
+  "30x90": { nom: "30×90", t: [.9, .3] },
+  "100x100": { nom: "100×100", t: [1, 1] },
+  "60x120v": { nom: "60×120 vertical", t: [.6, 1.2] },
+  "15x90": { nom: "Lames 15×90", t: [.9, .15], decale: true },
+  "20x180": { nom: "Lames 20×180", t: [1.8, .2], decale: true },
   "parquet": { nom: "Lames 20×120", t: [1.2, .2], decale: true },
   "uni": { nom: "Sans joint (béton ciré, résine)", t: [2, 2], sansJoint: true }
 };
@@ -147,7 +182,12 @@ const ROBINETTERIE = {
   blanc: { nom: "Blanc mat", couleur: "#f2f2f0", c: 0xf2f2f0, m: .1, r: .5 }
 };
 function appliquerRobinetterie(cle) { const r = ROBINETTERIE[cle] || ROBINETTERIE.noir; MAT.robinet.color.setHex(r.c); MAT.robinet.metalness = r.m; MAT.robinet.roughness = r.r; MAT.robinet.envMapIntensity = r.m > .5 ? 1 : .3; }
-const PEINTURES = { "#f3f1ec": "Blanc cassé", "#e6ddd0": "Lin", "#cfd6cf": "Vert d'eau", "#c9d3db": "Bleu brume", "#d9c3b5": "Rose poudré", "#e9d8b0": "Jaune paille", "#8a8f93": "Gris orage", "#4a5a52": "Vert forêt", "#2c3440": "Bleu nuit" };
+const PEINTURES = { "#ffffff": "Blanc pur", "#f3f1ec": "Blanc cassé", "#ece4d6": "Ivoire", "#e6ddd0": "Lin", "#d8cbb8": "Beige sable", "#bfb2a3": "Grège", "#9c8f80": "Taupe",
+  "#dcdcd8": "Gris perle", "#b9bab6": "Gris clair", "#8a8f93": "Gris orage", "#4d5257": "Anthracite", "#232427": "Noir",
+  "#cfd6cf": "Vert d'eau", "#b4bfa6": "Vert sauge", "#7d8a6a": "Vert olive", "#4a5a52": "Vert forêt", "#285a4b": "Vert émeraude",
+  "#c9d3db": "Bleu brume", "#9fb8c8": "Bleu ciel", "#4f7c8a": "Bleu canard", "#2c3440": "Bleu nuit",
+  "#efd9d2": "Rose pâle", "#d9c3b5": "Rose poudré", "#c98f7a": "Terracotta", "#a4553f": "Rouge brique", "#6b2a35": "Bordeaux",
+  "#e9d8b0": "Jaune paille", "#d6aa4f": "Jaune moutarde", "#c9b9d6": "Lavande" };
 
 /* =================== Matériaux des objets =================== */
 const MAT = {
@@ -452,8 +492,11 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
             <div class="champ"><label>Faux plafond</label><select id="fauxPlafond"><option value="0" ${!etat.fauxPlafond ? "selected" : ""}>Non</option><option value="1" ${etat.fauxPlafond ? "selected" : ""}>Oui, plaques hydrofuges</option></select></div>
             <div class="champ"><label>Dépose de l'existant</label><select id="depose"><option value="1" ${etat.depose ? "selected" : ""}>Oui</option><option value="0" ${!etat.depose ? "selected" : ""}>Non</option></select></div>
           </div>
-          <label>Peinture (au-dessus de la faïence)</label><div class="palette">${Object.entries(PEINTURES).map(([c, n]) => `<button type="button" class="pastille ${c === etat.peinture ? "actif" : ""}" data-peinture="${c}" title="${n}" aria-label="${n}" style="background:${c}"></button>`).join("")}</div>
         </fieldset>
+        <details class="groupe-ajout deroule-couleur"><summary>Peinture des murs<span><i class="mini" id="miniPeinture" style="background:${etat.peinture}"></i><b id="nomPeinture">${esc(PEINTURES[etat.peinture] || "")}</b></span></summary>
+          <p class="gris" style="font-size:13px;margin-bottom:8px">Visible au-dessus de la faïence et sur les murs non carrelés.</p>
+          <div class="palette">${Object.entries(PEINTURES).map(([c, n]) => `<button type="button" class="pastille ${c === etat.peinture ? "actif" : ""}" data-peinture="${c}" title="${n}" aria-label="${n}" style="background:${c}"></button>`).join("")}</div>
+        </details>
         ${["murs", "accent", "sol"].map(k => `
         <details class="groupe-ajout deroule-couleur"><summary>${TITRES[k]}<span><i class="mini" data-mini="${k}" style="background:${MATIERES[etat[k].matiere].couleur}"></i><b data-nommat="${k}">${esc(MATIERES[etat[k].matiere].nom)}</b></span></summary>
           ${k === "accent" ? `<label style="display:flex;gap:8px;align-items:center;text-transform:none;letter-spacing:0;font-weight:500;color:var(--encre)"><input type="checkbox" id="accentActif" ${etat.accent.actif ? "checked" : ""} style="width:auto"> Carrelage différent dans la douche (les murs de l'angle)</label>` : ""}
@@ -735,7 +778,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
       if (surf <= .01) return;
       const f = FORMATS[rev.format], [a, b] = f.t, grand = Math.max(a, b) >= .8;
       const chute = f.sansJoint ? 0 : f.decale || grand ? .15 : .10, total = surf * (1 + chute);
-      const plaque = rev.format === "5x5"; // la mosaïque se vend en plaques de 30 × 30
+      const plaque = rev.format === "5x5" || rev.format === "2.5x2.5"; // la mosaïque se vend en plaques de 30 × 30
       const n = f.sansJoint ? 0 : Math.ceil(total / (plaque ? .09 : a * b));
       lignes.push({ titre, cle: rev.format, joint: rev.joint, matiere: MATIERES[rev.matiere]?.nom || "", format: f.nom, surf, chute, total, n, unite: plaque ? "plaques 30×30" : rev.format === "parquet" ? "lames" : "carreaux" });
     };
@@ -936,7 +979,11 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
       if (k === "sol" && ["bois", "boisClair", "noyer"].includes(b.dataset[cle])) etat.sol.format = "parquet";
       panneau.querySelector(`[data-nommat="${k}"]`).textContent = MATIERES[b.dataset[cle]].nom;
       panneau.querySelector(`[data-mini="${k}"]`).style.background = MATIERES[b.dataset[cle]].couleur;
-    } else if (b.dataset.peinture) etat.peinture = b.dataset.peinture;
+    } else if (b.dataset.peinture) {
+      etat.peinture = b.dataset.peinture;
+      document.getElementById("nomPeinture").textContent = PEINTURES[etat.peinture] || "";
+      document.getElementById("miniPeinture").style.background = etat.peinture;
+    }
     else if (b.dataset.robinet) {
       etat.robinetterie = b.dataset.robinet; appliquerRobinetterie(etat.robinetterie);
       panneau.querySelectorAll("[data-robinet]").forEach(x => x.classList.toggle("actif", x === b));
