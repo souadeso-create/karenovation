@@ -117,6 +117,13 @@ export async function enregistrerParametres(data) {
   if (error) throw error;
 }
 
+/* Première ligne dont le champ vaut la valeur (ou null) */
+export async function chercher(table, champ, valeur) {
+  if (MODE_ESSAI) return lireLocal(table).find(x => x[champ] === valeur) || null;
+  const { data, error } = await sb.from(table).select("*").eq(champ, valeur).maybeSingle();
+  if (error) throw error;
+  return data;
+}
 /* Remplit la base des prestations la première fois (base Supabase vide). */
 export async function amorcerPrestations() {
   if (MODE_ESSAI) return;
@@ -132,5 +139,6 @@ export async function exporterTout() {
   const out = { exporte_le: new Date().toISOString(), parametres: await parametres() };
   for (const t of tables) out[t] = await lister(t);
   try { out.demandes = await lister("demandes"); } catch { /* table pas encore créée */ }
+  try { out.receptions = await lister("receptions"); } catch { /* table pas encore créée */ }
   return out;
 }

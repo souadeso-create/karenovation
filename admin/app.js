@@ -38,12 +38,22 @@ const SEPT_JOURS = 7 * 864e5;
 const aRelancer = d => d.type === "devis" && d.statut === "envoye" && !d.signe_le && d.jeton && Date.now() - new Date(d.updated_at || d.created_at) > SEPT_JOURS;
 async function listerDemandes() { try { return await db.lister("demandes"); } catch { return null; } }
 
-/* Envoie un message : WhatsApp si le client a un téléphone, sinon le partage du téléphone, sinon copie. */
+/* Envoie un message : on choisit WhatsApp, SMS ou une autre application (mail…). */
 async function envoyerMessage(d, texte) {
-  const tel = numeroWa(d.client?.tel);
-  if (tel.length >= 10) { window.open(`https://wa.me/${tel}?text=${encodeURIComponent(texte)}`, "_blank"); return; }
-  if (navigator.share) { try { await navigator.share({ text: texte }); return; } catch (e) { if (e.name === "AbortError") return; } }
-  await navigator.clipboard.writeText(texte); toast("Message copié ✓");
+  const tel = numeroWa(d.client?.tel), brut = String(d.client?.tel || "").replace(/\s/g, "");
+  const autre = async () => {
+    if (navigator.share) { try { await navigator.share({ text: texte }); return; } catch (e) { if (e.name === "AbortError") return; } }
+    await navigator.clipboard.writeText(texte); toast("Message copié ✓");
+  };
+  if (tel.length < 10) return autre();
+  const f = fenetre("Envoyer par", `<div class="actions-doc" style="margin:0">
+    <button class="btn" data-par="wa">WhatsApp</button><button class="btn clair" data-par="sms">SMS</button><button class="btn discret" data-par="autre">Autre (mail…)</button></div>`);
+  f.el.addEventListener("click", e => {
+    const b = e.target.closest("[data-par]"); if (!b) return; f.fermer();
+    if (b.dataset.par === "wa") window.open(`https://wa.me/${tel}?text=${encodeURIComponent(texte)}`, "_blank");
+    else if (b.dataset.par === "sms") location.href = `sms:${brut}?&body=${encodeURIComponent(texte)}`;
+    else autre();
+  });
 }
 
 function toast(msg) {
@@ -188,6 +198,7 @@ async function vueDocument(id, type, params) {
             <button class="btn clair" id="pdf">${ICO.pdf}PDF</button>
             <button class="btn clair" id="partage">${ICO.partage}Envoyer</button>
             ${estDevis && d.id ? `<button class="btn discret" id="versFacture">Transformer en facture</button>` : ""}
+            ${d.id && ((estDevis && d.statut === "signe") || (!estDevis && d.devis_id)) ? `<a class="btn clair" href="#/reception/${estDevis ? d.id : d.devis_id}">PV de fin de chantier</a>` : ""}
             ${d.id ? `<button class="btn discret" id="dupliquer">Dupliquer</button>` : ""}
             ${d.id && (estDevis || d.statut === "brouillon") ? `<button class="btn danger" id="suppr">${ICO.poubelle}Supprimer</button>` : ""}
           </div>
@@ -410,7 +421,7 @@ async function vueDemande(id) {
       </div>
       <div>
         <div class="actions-doc">
-          ${x.tel ? `<a class="btn" href="tel:${esc(tel)}">Appeler</a><a class="btn clair" href="https://wa.me/${numeroWa(x.tel)}" target="_blank" rel="noopener">WhatsApp</a>` : ""}
+          ${x.tel ? `<a class="btn" href="tel:${esc(tel)}">Appeler</a><a class="btn clair" href="https://wa.me/${numeroWa(x.tel)}" target="_blank" rel="noopener">WhatsApp</a><a class="btn clair" href="sms:${esc(tel)}">SMS</a>` : ""}
           ${x.client_id ? `<a class="btn clair" href="#/client/${x.client_id}">${ICO.client}Fiche client</a><a class="btn clair" href="#/document/nouveau/devis?client=${x.client_id}">${ICO.plus}Devis</a>`
             : `<button class="btn clair" id="versClient">${ICO.client}Créer la fiche client</button>`}
           <button class="btn discret" id="traitee">${x.statut === "traitee" ? "Remettre en nouvelle" : "Marquer comme traitée"}</button>
@@ -665,7 +676,7 @@ async function routeur() {
   const [chemin, requete] = (location.hash.slice(2) || "accueil").split("?");
   const params = new URLSearchParams(requete || "");
   const [r, a, b] = chemin.split("/");
-  nav.querySelectorAll("a").forEach(x => x.classList.toggle("actif", x.dataset.r === r || (r === "document" && x.dataset.r === "documents") || (r === "client" && x.dataset.r === "clients") || (r === "demande" && x.dataset.r === "demandes") || (["3d", "reglages"].includes(r) && x.dataset.r === "plus")));
+  nav.querySelectorAll("a").forEach(x => x.classList.toggle("actif", x.dataset.r === r || (r === "document" && x.dataset.r === "documents") || (r === "client" && x.dataset.r === "clients") || (r === "demande" && x.dataset.r === "demandes") || (r === "reception" && x.dataset.r === "documents") || (["3d", "reglages"].includes(r) && x.dataset.r === "plus")));
   window.scrollTo(0, 0);
   try {
     if (r === "accueil") await vueAccueil();
@@ -679,6 +690,7 @@ async function routeur() {
     else if (r === "plus") vuePlus();
     else if (r === "reglages") vueReglages();
     else if (r === "3d") await vue3D(params);
+    else if (r === "reception") { const { vueReception } = await import("./reception.js"); await vueReception(vue, { db, docId: a, P, toast, esc, erreur }); }
     else await vueAccueil();
   } catch (e) { erreur(e); }
 }

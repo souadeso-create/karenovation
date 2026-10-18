@@ -108,6 +108,11 @@
   .barre-total { position: sticky; bottom: calc(66px + env(safe-area-inset-bottom)); z-index: 20; background: var(--encre); color: #fff; border-radius: 16px; padding: 12px 14px 12px 18px; display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 16px; box-shadow: 0 10px 30px rgba(0,0,0,.2); }
   .barre-total .montant { font-size: 22px; }
   .barre-total small { color: #bdb6ac; display: block; font-size: 12px; }
+  .photos-pv { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .photos-pv div { position: relative; }
+  .photos-pv img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 10px; display: block; }
+  .photos-pv .icone { position: absolute; top: 4px; right: 4px; background: rgba(255,255,255,.9); width: 30px; height: 30px; }
+  .pad-signature { width: 100%; height: 200px; background: #fff; border: 1px dashed var(--sable); border-radius: 12px; touch-action: none; display: block; }
   .detail-ligne { font-size: 13px; color: var(--gris); margin-top: 6px; }
   .actions-doc { display: flex; gap: 8px; flex-wrap: wrap; margin: 18px 0; }
 
