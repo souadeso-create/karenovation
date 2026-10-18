@@ -416,7 +416,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
 
   const pal = (liste, choisi, attr) => Object.entries(liste).map(([k, v]) => `<button type="button" class="pastille ${k === choisi ? "actif" : ""}" data-${attr}="${k}" title="${esc(v.nom)}" aria-label="${esc(v.nom)}" style="background:${v.couleur}"></button>`).join("");
   const opts = (liste, choisi) => Object.entries(liste).map(([k, v]) => `<option value="${k}" ${k === choisi ? "selected" : ""}>${esc(v.nom || v)}</option>`).join("");
-  const TITRES = { murs: "Carrelage des murs", accent: "Mur de la douche", sol: "Sol" };
+  const TITRES = { murs: "Carrelage des murs", accent: "Murs de la douche", sol: "Sol" };
   vue.innerHTML = `
     <div class="entete"><div><div class="petit">Simulation 3D · chantier</div><h1 id="titreSim" title="Renommer">${esc(etat.nom)}</h1></div>
       <button class="btn clair" id="clientSim">${client ? esc(nomClient(client)) : "Associer un client"}</button></div>
@@ -455,7 +455,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
         </fieldset>
         ${["murs", "accent", "sol"].map(k => `
         <details class="groupe-ajout deroule-couleur"><summary>${TITRES[k]}<span><i class="mini" data-mini="${k}" style="background:${MATIERES[etat[k].matiere].couleur}"></i><b data-nommat="${k}">${esc(MATIERES[etat[k].matiere].nom)}</b></span></summary>
-          ${k === "accent" ? `<label style="display:flex;gap:8px;align-items:center;text-transform:none;letter-spacing:0;font-weight:500;color:var(--encre)"><input type="checkbox" id="accentActif" ${etat.accent.actif ? "checked" : ""} style="width:auto"> Carrelage différent derrière la douche</label>` : ""}
+          ${k === "accent" ? `<label style="display:flex;gap:8px;align-items:center;text-transform:none;letter-spacing:0;font-weight:500;color:var(--encre)"><input type="checkbox" id="accentActif" ${etat.accent.actif ? "checked" : ""} style="width:auto"> Carrelage différent dans la douche (les murs de l'angle)</label>` : ""}
           <div class="palette" style="margin:6px 0 4px">${pal(MATIERES, etat[k].matiere, "mat-" + k)}</div>
           <div class="deux">
             <div class="champ"><label>Format</label><select data-format="${k}">${opts(FORMATS, etat[k].format)}</select></div>
@@ -501,12 +501,26 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
   const MURS = () => { const { l, p } = etat.dims; return [
     { w: l, c: [0, -p / 2], rot: 0, n: [0, 0, 1] }, { w: p, c: [l / 2, 0], rot: -Math.PI / 2, n: [-1, 0, 0] },
     { w: l, c: [0, p / 2], rot: Math.PI, n: [0, 0, -1] }, { w: p, c: [-l / 2, 0], rot: Math.PI / 2, n: [1, 0, 0] }]; };
-  function murDeLaDouche() {
-    const o = etat.objets.find(x => x.type === "douche"); if (!o) return -1;
-    const { l, p } = etat.dims;
-    const d = [o.z + p / 2, l / 2 - o.x, p / 2 - o.z, o.x + l / 2];
-    return d.indexOf(Math.min(...d));
+
+  // Zone de douche sur chaque mur qu'elle touche (les deux murs si elle est dans un angle) :
+  // { indice du mur: [début, fin] } en mètres, le long du mur, dans le repère du mur.
+  function zonesDouche() {
+    const o = etat.objets.find(x => x.type === "douche"); if (!o) return {};
+    const { l, p } = etat.dims, travers = murDe(o.rot) % 2 === 1;
+    const [ex, ez] = travers ? [o.d, o.w] : [o.w, o.d];
+    const x0 = o.x - ex / 2, x1 = o.x + ex / 2, z0 = o.z - ez / 2, z1 = o.z + ez / 2;
+    const ecarts = [z0 + p / 2, l / 2 - x1, p / 2 - z1, x0 + l / 2];
+    const bornes = [[x0, x1, l], [z0, z1, p], [-x1, -x0, l], [-z1, -z0, p]];
+    const proche = ecarts.map(e => e < .15);
+    if (!proche.some(Boolean)) proche[ecarts.indexOf(Math.min(...ecarts))] = true;
+    const z = {};
+    proche.forEach((ok, i) => { if (!ok) return;
+      let [a, b, w] = bornes[i]; a = Math.max(-w / 2, a); b = Math.min(w / 2, b);
+      if (a + w / 2 < .15) a = -w / 2; if (w / 2 - b < .15) b = w / 2; // on va jusqu'à l'angle
+      if (b - a > .05) z[i] = [a, b]; });
+    return z;
   }
+  const hauteurFaience = h => etat.faience === "plafond" ? h : etat.faience === "120" ? 1.2 : 0;
 
   function construirePiece() {
     piece.clear(); murs = [];
@@ -514,15 +528,19 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     Object.assign(AMBIANCE, { murs: etat.murs, peinture: etat.peinture, faience: etat.faience, h });
     const sol = new THREE.Mesh(new THREE.PlaneGeometry(l, p), materiauCarrelage(etat.sol, l, p, true));
     sol.rotation.x = -Math.PI / 2; sol.receiveShadow = true; piece.add(sol);
-    const md = murDeLaDouche();
+    const zones = zonesDouche(), hf = hauteurFaience(h);
     MURS().forEach((d, i) => {
       const g = new THREE.Group(); g.position.set(d.c[0], 0, d.c[1]); g.rotation.y = d.rot;
       g.userData.normale = new THREE.Vector3(...d.n); g.userData.centre = new THREE.Vector3(d.c[0], h / 2, d.c[1]);
-      const rev = etat.accent.actif && i === md ? etat.accent : etat.murs;
-      const hf = etat.faience === "plafond" ? h : etat.faience === "120" ? (i === md ? h : 1.2) : (i === md ? h : 0);
-      if (hf > 0) { const m = new THREE.Mesh(new THREE.PlaneGeometry(d.w, hf), materiauCarrelage(rev, d.w, hf)); m.position.y = hf / 2; m.receiveShadow = true; g.add(m); }
+      if (hf > 0) { const m = new THREE.Mesh(new THREE.PlaneGeometry(d.w, hf), materiauCarrelage(etat.murs, d.w, hf)); m.position.y = hf / 2; m.receiveShadow = true; g.add(m); }
       if (hf < h) { const m = new THREE.Mesh(new THREE.PlaneGeometry(d.w, h - hf), new THREE.MeshStandardMaterial({ color: new THREE.Color(etat.peinture), roughness: .9 })); m.position.y = hf + (h - hf) / 2; m.receiveShadow = true; g.add(m); }
-      if (hf > 0 && hf < h) g.add(pose(boite(d.w, .015, .012, MAT.chrome), 0, hf, .006));
+      const zd = zones[i];
+      if (zd && (etat.accent.actif || hf < h)) { // la zone de douche, carrelée jusqu'au plafond
+        const zw = zd[1] - zd[0], m = new THREE.Mesh(new THREE.PlaneGeometry(zw, h), materiauCarrelage(etat.accent.actif ? etat.accent : etat.murs, zw, h));
+        m.position.set((zd[0] + zd[1]) / 2, h / 2, .002); m.receiveShadow = true; g.add(m);
+      }
+      if (hf > 0 && hf < h) (zd ? [[-d.w / 2, zd[0]], [zd[1], d.w / 2]] : [[-d.w / 2, d.w / 2]]).forEach(([a, b]) => {
+        if (b - a > .01) g.add(pose(boite(b - a, .015, .012, MAT.chrome), (a + b) / 2, hf, .006)); });
       g.children.forEach(m => { m.material.transparent = chantier; m.material.opacity = chantier ? .28 : 1; m.material.depthWrite = !chantier; });
       piece.add(g); murs.push(g);
     });
@@ -627,6 +645,33 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     etat.objets.push(o); selection = etat.objets.length - 1; reconstruire();
     return selection;
   }
+  // Ajout : une fenêtre s'ouvre là où l'on est ; on choisit, on valide, et la page ne bouge pas.
+  function choisirAvantAjout(t) {
+    const c = CAT[t], o = { type: t, x: 0, z: 0, rot: 0 }; completer(o);
+    const v = document.createElement("div"); v.className = "voile";
+    v.innerHTML = `<div class="fenetre" role="dialog" aria-modal="true"><div class="tete"><h2>${esc(c.nom)}</h2><button class="icone" data-fermer aria-label="Fermer">✕</button></div>
+      <div data-champs>${champsObjet(o, c)}</div>
+      <div class="actions-doc" style="margin-bottom:0"><button type="button" class="btn" data-valider>Ajouter</button><button type="button" class="btn discret" data-fermer>Annuler</button></div></div>`;
+    document.body.appendChild(v);
+    const champs = v.querySelector("[data-champs]");
+    v.addEventListener("change", e => {
+      const x = e.target;
+      if (x.dataset.od) { const n = Number(x.value) || 0; o[x.dataset.od] = x.dataset.od === "y" ? Math.max(0, n) / 100 : Math.max(1, n) / 100; }
+      else if (x.dataset.opt) o[x.dataset.opt] = x.value;
+    });
+    v.addEventListener("click", e => {
+      if (e.target === v || e.target.closest("[data-fermer]")) { v.remove(); return; }
+      const b = e.target.closest("button"); if (!b) return;
+      if (b.dataset.taille) { [o.w, o.d] = b.dataset.taille.split("x").map(n => Number(n) / 100); champs.innerHTML = champsObjet(o, c); }
+      else if (b.dataset.opt) { o[b.dataset.opt] = b.dataset.val; champs.innerHTML = champsObjet(o, c); }
+      else if (b.hasAttribute("data-valider")) {
+        v.remove();
+        if (c.pose === "mur" || c.pose === "dansMur") o.z = -etat.dims.p / 2;
+        etat.objets.push(o); construirePiece(); construireObjets(); doser();
+        toast(`${c.nom} ajouté : faites-le glisser dans la 3D`);
+      }
+    });
+  }
   function reconstruire() { construirePiece(); construireObjets(); afficherSelection(); doser(); }
 
   /* --- Rendu --- */
@@ -654,12 +699,12 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
 
   /* --- Métré --- */
   function metre() {
-    const { l, p, h } = etat.dims, md = murDeLaDouche();
+    const { l, p, h } = etat.dims, hf = hauteurFaience(h);
     const largeurs = [l, p, l, p];
     let murm2 = 0;
-    largeurs.forEach((w, i) => { const hf = etat.faience === "plafond" ? h : etat.faience === "120" ? (i === md ? h : 1.2) : (i === md ? h : 0); murm2 += w * hf; });
+    largeurs.forEach(w => { murm2 += w * hf; });
+    Object.values(zonesDouche()).forEach(([a, b]) => { murm2 += (b - a) * (h - hf); });
     etat.objets.filter(o => o.type === "porte" || o.type === "fenetre").forEach(o => {
-      const i = murDe(o.rot), hf = etat.faience === "plafond" ? h : etat.faience === "120" ? (i === md ? h : 1.2) : (i === md ? h : 0);
       murm2 -= o.w * Math.max(0, Math.min(o.y + o.h, hf) - o.y);
     });
     const peint = 2 * (l + p) * h - murm2 - etat.objets.filter(o => o.type === "porte").reduce((a, o) => a + o.w * o.h, 0);
@@ -700,12 +745,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
   });
 
   const LIBELLES = { receveur: "Receveur", diametre: "Diamètre", ouverture: "Ouverture", couleur: "Couleur", modele: "Modèle", style: "Pose", facade: "Façade" };
-  function afficherSelection() {
-    const p = document.getElementById("selPanneau");
-    if (selection === null || !etat.objets[selection]) { selection = null; p.hidden = true; return; }
-    const o = etat.objets[selection], c = CAT[o.type];
-    p.hidden = false;
-    p.innerHTML = `<div class="entete" style="margin-bottom:10px"><h2>${esc(c.nom)}</h2><button type="button" class="icone" data-sel="fermer" aria-label="Fermer">✕</button></div>
+  const champsObjet = (o, c) => `
       ${c.tailles ? `<label>Tailles courantes</label><div class="palette" style="margin-bottom:12px">${c.tailles.map(([w, d]) => `<button type="button" class="btn ${cm(o.w) === w && cm(o.d) === d ? "" : "discret"} petit-btn" data-taille="${w}x${d}">${w} × ${d}</button>`).join("")}</div>` : ""}
       <div class="trois">
         <div class="champ"><label>Largeur cm</label><input type="number" data-od="w" value="${cm(o.w)}" inputmode="numeric"></div>
@@ -715,7 +755,14 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
       ${c.pose === "mur" || c.pose === "dansMur" ? `<div class="champ"><label>Hauteur de pose (cm depuis le sol)</label><input type="number" data-od="y" value="${cm(o.y || 0)}" inputmode="numeric"></div>` : ""}
       ${Object.entries(c.options || {}).map(([k, vals]) => k === "finition"
         ? `<label>Finition</label><div class="palette" style="margin-bottom:12px">${vals.map(v => `<button type="button" class="pastille ${o[k] === v ? "actif" : ""}" data-opt="${k}" data-val="${v}" title="${BOIS[v]}" aria-label="${BOIS[v]}" style="background:${v}"></button>`).join("")}</div>`
-        : `<div class="champ"><label>${LIBELLES[k] || k}</label><select data-opt="${k}">${vals.map(v => `<option ${o[k] === v ? "selected" : ""}>${esc(v)}</option>`).join("")}</select></div>`).join("")}
+        : `<div class="champ"><label>${LIBELLES[k] || k}</label><select data-opt="${k}">${vals.map(v => `<option ${o[k] === v ? "selected" : ""}>${esc(v)}</option>`).join("")}</select></div>`).join("")}`;
+  function afficherSelection() {
+    const p = document.getElementById("selPanneau");
+    if (selection === null || !etat.objets[selection]) { selection = null; p.hidden = true; return; }
+    const o = etat.objets[selection], c = CAT[o.type];
+    p.hidden = false;
+    p.innerHTML = `<div class="entete" style="margin-bottom:10px"><h2>${esc(c.nom)}</h2><button type="button" class="icone" data-sel="fermer" aria-label="Fermer">✕</button></div>
+      ${champsObjet(o, c)}
       <div class="actions-doc" style="margin:6px 0 0">
         <button type="button" class="btn clair petit-btn" data-sel="tourner">↻ ${c.pose === "mur" || c.pose === "dansMur" ? "Mur suivant" : "Tourner"}</button>
         <button type="button" class="btn discret petit-btn" data-sel="dupliquer">Dupliquer</button>
@@ -765,8 +812,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
       document.getElementById("miniRobinet").style.background = ROBINETTERIE[etat.robinetterie].couleur; return;
     }
     else if (b.dataset.ajout) {
-      const t = b.dataset.ajout; ajouterObjet(t);
-      toast(`${CAT[t].nom} ajouté : faites-le glisser`); return;
+      choisirAvantAjout(b.dataset.ajout); return;
     } else return;
     b.parentElement.querySelectorAll(".pastille").forEach(x => x.classList.toggle("actif", x === b));
     panneau.querySelectorAll("[data-format]").forEach(s => { s.value = etat[s.dataset.format].format; });
@@ -1128,7 +1174,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
       photo ? null : "- N'ajoute RIEN qui n'est pas sur l'image 3D : pas de porte, pas de fenêtre, pas de mur ou de cloison en plus, pas de niche, pas de radiateur, pas de meuble, pas de miroir en plus. Les murs coupés de la maquette ne doivent pas apparaître.",
       `- Pièce de ${metres(l)} × ${metres(p)}, hauteur ${metres(h)}.`,
       `- Carrelage mural ${faience} : ${revetement(etat.murs)}.`,
-      etat.accent.actif ? `- Mur de la douche : ${revetement(etat.accent)}.` : null,
+      etat.accent.actif ? `- Murs de la douche (seulement la zone de douche, ${Object.keys(zonesDouche()).length > 1 ? "sur les deux murs de l'angle" : "sur le mur du fond de la douche"}, jusqu'au plafond) : ${revetement(etat.accent)}.` : null,
       `- Sol : ${revetement(etat.sol)}.`,
       etat.faience !== "plafond" ? `- Peinture au-dessus du carrelage : ${(PEINTURES[etat.peinture] || "").toLowerCase()}, finition mate.` : null,
       `- Robinetterie et poignées : ${(ROBINETTERIE[etat.robinetterie]?.nom || "").toLowerCase()}. Les autres éléments gardent leur couleur indiquée ci-dessous.`,
