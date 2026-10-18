@@ -185,6 +185,14 @@ function tube(a, b, r, m) {
    Chaque modèle est dessiné centré en x, dos vers z- , posé au sol (y = 0).
    pose : "sol", "mur" (contre le mur le plus proche), "dansMur" (porte, fenêtre, réseaux : caché avec son mur), "plafond". */
 const CAT = {
+  decroche: { nom: "Décroché / coffrage", groupe: "Structure", pose: "sol", dims: [40, 30, 250], tailles: [[30, 30], [40, 30], [60, 20], [100, 60], [120, 90]],
+    faire(w, d) { // du sol au plafond, habillé comme les murs (gaine, poteau, coffrage, retour de mur pour une pièce en L)
+      const g = new THREE.Group(), h = AMBIANCE.h, hf = AMBIANCE.faience === "plafond" ? h : AMBIANCE.faience === "120" ? 1.2 : 0;
+      const peint = new THREE.MeshStandardMaterial({ color: new THREE.Color(AMBIANCE.peinture), roughness: .9 });
+      const face = (larg, haut) => AMBIANCE.murs && haut > 0 ? materiauCarrelage(AMBIANCE.murs, larg, haut) : peint;
+      if (hf > 0) { const b = new THREE.Mesh(new THREE.BoxGeometry(w, hf, d), [face(d, hf), face(d, hf), peint, peint, face(w, hf), face(w, hf)]); b.position.y = hf / 2; b.castShadow = b.receiveShadow = true; g.add(b); }
+      if (hf < h) { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h - hf, d), peint); b.position.y = hf + (h - hf) / 2; b.castShadow = b.receiveShadow = true; g.add(b); }
+      return g; } },
   douche: { nom: "Douche à l'italienne", groupe: "Sanitaires", pose: "sol", dims: [120, 90, 200], tailles: [[90, 90], [120, 80], [120, 90], [140, 90], [160, 90]], options: { receveur: ["Noir", "Blanc", "Carrelé"] },
     faire(w, d, h, o) {
       const g = new THREE.Group();
@@ -238,8 +246,8 @@ const CAT = {
       const cuv = new THREE.Mesh(new THREE.CapsuleGeometry(w / 2 - .02, Math.max(.01, d - .55), 6, 16), MAT.ceramique);
       cuv.rotation.x = Math.PI / 2; cuv.scale.set(1, 1, .6); cuv.position.set(0, .36, .05); g.add(cuv);
       return g; } },
-  vasque: { nom: "Meuble vasque", groupe: "Meubles", pose: "mur", dims: [80, 46, 55], tailles: [[60, 46], [80, 46], [100, 46]], options: { finition: Object.keys(BOIS) }, faire: (w, d, h, o) => meuble(w, d, h, 1, o) },
-  double: { nom: "Double vasque", groupe: "Meubles", pose: "mur", dims: [120, 46, 55], tailles: [[120, 46], [140, 46], [160, 46]], options: { finition: Object.keys(BOIS) }, faire: (w, d, h, o) => meuble(w, d, h, 2, o) },
+  vasque: { nom: "Meuble vasque", groupe: "Meubles", pose: "mur", dims: [80, 46, 55], tailles: [[60, 46], [80, 46], [100, 46]], options: { finition: Object.keys(BOIS), style: ["Suspendu", "Sur pieds"], facade: ["2 tiroirs", "1 tiroir", "Portes", "Sans poignée"] }, faire: (w, d, h, o) => meuble(w, d, h, 1, o) },
+  double: { nom: "Double vasque", groupe: "Meubles", pose: "mur", dims: [120, 46, 55], tailles: [[120, 46], [140, 46], [160, 46]], options: { finition: Object.keys(BOIS), style: ["Suspendu", "Sur pieds"], facade: ["2 tiroirs", "1 tiroir", "Portes", "Sans poignée"] }, faire: (w, d, h, o) => meuble(w, d, h, 2, o) },
   vasquePoser: { nom: "Plan + vasque à poser", groupe: "Meubles", pose: "mur", dims: [100, 46, 4], tailles: [[80, 46], [100, 46], [120, 46]], options: { finition: Object.keys(BOIS) },
     faire(w, d, h, o) {
       const g = new THREE.Group();
@@ -287,10 +295,17 @@ const CAT = {
       g.add(pose(boite(.02, .02, .08, MAT.noir), (coul ? w * .25 : 0) + w / 2 - .08, 1.02, .05));
       return g; } },
   fenetre: { nom: "Fenêtre", groupe: "Ouvertures", pose: "dansMur", dims: [60, 4, 75], tailles: [[45, 4], [60, 4], [80, 4], [100, 4]], hauteur: 120,
-    faire(w, d, h) { const g = new THREE.Group();
+    options: { modele: ["Battante", "Oscillo-battante", "Fixe", "Pavés de verre"] },
+    faire(w, d, h, o) { const g = new THREE.Group(), m = o?.modele || "Battante";
+      if (m === "Pavés de verre") { // briques de verre de 19 cm
+        const n = Math.max(1, Math.round(w / .19)), r = Math.max(1, Math.round(h / .19)), pw = w / n, ph = h / r;
+        for (let i = 0; i < n; i++) for (let j = 0; j < r; j++) g.add(pose(boite(pw - .012, ph - .012, .05, MAT.vitre), -w / 2 + pw * (i + .5), ph * (j + .5), .02));
+        return g;
+      }
       g.add(pose(new THREE.Mesh(new THREE.PlaneGeometry(w, h), MAT.vitre), 0, h / 2, .01));
       [0, h].forEach(y => g.add(pose(boite(w + .06, .05, .05, MAT.blanc), 0, y, .015)));
-      [-w / 2, w / 2, 0].forEach(x => g.add(pose(boite(.05, h, .05, MAT.blanc), x, h / 2, .015)));
+      [-w / 2, w / 2].concat(m === "Fixe" || w < .55 ? [] : [0]).forEach(x => g.add(pose(boite(.05, h, .05, MAT.blanc), x, h / 2, .015)));
+      if (m !== "Fixe") g.add(pose(boite(.02, .12, .03, MAT.robinet), m === "Oscillo-battante" || w < .55 ? w / 2 - .06 : .05, h / 2, .05));
       g.add(pose(boite(w + .1, .03, .12, MAT.blanc), 0, -.02, .05));
       return g; } },
   arrivees: { nom: "Arrivées eau chaude / froide", groupe: "Réseaux", pose: "dansMur", dims: [20, 2, 100], hauteur: 0,
@@ -327,10 +342,17 @@ function meuble(w, d, h, n, o) {
     g.add(pose(cyl(.012, .22, MAT.robinet), x, haut + .11, -d / 2 + .05));
     const bec = cyl(.008, .12, MAT.robinet); bec.rotation.x = Math.PI / 2; g.add(pose(bec, x, haut + .2, -d / 2 + .1));
   }
-  [-.1, .08].forEach(y => g.add(pose(boite(w * .3, .015, .01, MAT.robinet), 0, haut - h / 2 + y, d / 2 + .006)));
+  const bas = haut - h, avant = d / 2 + .006, fa = o.facade || "2 tiroirs";
+  if (fa === "2 tiroirs") [-.1, .08].forEach(y => g.add(pose(boite(w * .3, .015, .01, MAT.robinet), 0, haut - h / 2 + y, avant)));
+  if (fa === "1 tiroir") g.add(pose(boite(w * .35, .015, .01, MAT.robinet), 0, haut - .1, avant));
+  if (fa === "Portes") { g.add(pose(boite(.004, h - .08, .006, MAT.noir), 0, haut - h / 2 - .02, avant)); [-.06, .06].forEach(x => g.add(pose(boite(.012, .14, .01, MAT.robinet), x, haut - .14, avant))); }
+  if (fa === "Sans poignée" || fa === "2 tiroirs") g.add(pose(boite(w - .02, .004, .006, MAT.noir), 0, haut - h / 2 - .01, avant)); // joint entre tiroirs
+  if (o.style === "Sur pieds") [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => g.add(pose(cyl(.012, bas - .02, MAT.robinet), sx * (w / 2 - .04), (bas - .02) / 2, sz * (d / 2 - .04))));
   return g;
 }
-const GROUPES = ["Sanitaires", "Meubles", "Équipements", "Ouvertures", "Réseaux"];
+const GROUPES = ["Structure", "Sanitaires", "Meubles", "Équipements", "Ouvertures", "Réseaux"];
+// revêtements des murs en cours, pour habiller les décrochés comme les murs
+const AMBIANCE = { murs: null, peinture: "#f3f1ec", faience: "plafond", h: 2.5 };
 
 /* =================== Métré → lignes de devis (mots cherchés dans les prestations) =================== */
 const POUR_DEVIS = {
@@ -382,6 +404,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     if (typeof e.accent === "string") e.accent = { matiere: MATIERES[e.accent] ? e.accent : "bleu", format: "7.5x15", joint: "blanc", actif: true };
     (e.objets || []).forEach(o => { if (o.type === "Battante" || o.type === "Coulissante") { o.ouverture = o.type; o.type = "porte"; } });
     if (!e.robinetterie) e.robinetterie = "noir";
+    if (!e.pente) e.pente = { mur: "aucun", basse: 1, largeur: 1.2 };
     return e;
   }
   function completer(o) {
@@ -423,6 +446,9 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
           </div>
           <div class="deux">
             <div class="champ"><label>Faïence</label><select id="faience"><option value="plafond" ${etat.faience === "plafond" ? "selected" : ""}>Jusqu'au plafond</option><option value="120" ${etat.faience === "120" ? "selected" : ""}>Hauteur 1,20 m</option><option value="douche" ${etat.faience === "douche" ? "selected" : ""}>Zone douche seulement</option></select></div>
+            <div class="champ"><label>Plafond</label><select id="penteMur">${["aucun", "gauche", "droite", "fond", "devant"].map(m => `<option value="${m}" ${(etat.pente?.mur || "aucun") === m ? "selected" : ""}>${m === "aucun" ? "Plat" : "Sous pente, côté " + m}</option>`).join("")}</select></div>
+            <div class="champ"><label>Pente : hauteur basse cm</label><input type="number" id="penteBasse" value="${cm(etat.pente?.basse || 1)}" inputmode="numeric"></div>
+            <div class="champ"><label>Largeur de la pente cm</label><input type="number" id="penteLarg" value="${cm(etat.pente?.largeur || 1.2)}" inputmode="numeric"></div>
             <div class="champ"><label>Dépose de l'existant</label><select id="depose"><option value="1" ${etat.depose ? "selected" : ""}>Oui</option><option value="0" ${!etat.depose ? "selected" : ""}>Non</option></select></div>
           </div>
           <label>Peinture (au-dessus de la faïence)</label><div class="palette">${Object.entries(PEINTURES).map(([c, n]) => `<button type="button" class="pastille ${c === etat.peinture ? "actif" : ""}" data-peinture="${c}" title="${n}" aria-label="${n}" style="background:${c}"></button>`).join("")}</div>
@@ -468,6 +494,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
   Object.assign(soleil.shadow.camera, { left: -5, right: 5, top: 5, bottom: -5 }); scene.add(soleil);
   const plafonnier = new THREE.PointLight(0xfff0d8, 1.2, 9, 1.6); scene.add(plafonnier);
   const piece = new THREE.Group(), meubles = new THREE.Group(); scene.add(piece, meubles);
+  let rampant = null; // plafond en pente (combles) : le plan coupe murs et meubles au-dessus
   let murs = []; const objetsMesh = new Map();
 
   // murs : 0 fond (z-), 1 droite (x+), 2 avant (z+), 3 gauche (x-)
@@ -486,6 +513,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
   function construirePiece() {
     piece.clear(); murs = [];
     const { l, p, h } = etat.dims;
+    Object.assign(AMBIANCE, { murs: etat.murs, peinture: etat.peinture, faience: etat.faience, h });
     const sol = new THREE.Mesh(new THREE.PlaneGeometry(l, p), materiauCarrelage(etat.sol, l, p, true));
     sol.rotation.x = -Math.PI / 2; sol.receiveShadow = true; piece.add(sol);
     const md = murDeLaDouche();
@@ -501,7 +529,29 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
       piece.add(g); murs.push(g);
     });
     plafonnier.position.set(0, h - .1, 0);
+    construirePente();
+    if (meubles.children.length) etat.objets.forEach((o, i) => { if (o.type === "decroche") { selection === i ? (refaireIndex(i)) : refaireIndex(i); } });
     majMetre(); doser();
+  }
+  // pente : depuis le mur choisi, de la hauteur basse jusqu'à la pleine hauteur sur la largeur donnée
+  function construirePente() {
+    if (rampant) { scene.remove(rampant); rampant = null; }
+    const pe = etat.pente || {}; renderer.clippingPlanes = [];
+    if (!pe.mur || pe.mur === "aucun") return;
+    const { l, p, h } = etat.dims, basse = Math.min(pe.basse || 1, h - .1), larg = Math.max(.3, pe.largeur || 1.2), k = (h - basse) / larg;
+    // repère : u = distance au mur choisi (vers la pièce), le long du mur = autre axe
+    const cfg = { gauche: [1, 0, -l / 2, p], droite: [-1, 0, l / 2, p], fond: [0, 1, -p / 2, l], devant: [0, -1, p / 2, l] }[pe.mur];
+    const [ax, az, origine, longueur] = cfg;
+    // plan gardé : y <= basse + k * u, avec u = ax * (x - origine) + az * (z - origine)
+    const n = new THREE.Vector3(k * ax, -1, k * az), c = basse - k * (ax * (ax ? origine : 0) + az * (az ? origine : 0)) + .004;
+    const lg = n.length(); renderer.clippingPlanes = [new THREE.Plane(n.divideScalar(lg), c / lg)];
+    // le rampant lui-même
+    const a = [], pt = (u, t) => { const x = ax ? origine + ax * u : t, z = az ? origine + az * u : t; return [x, basse + k * u, z]; };
+    [[0, -longueur / 2], [0, longueur / 2], [larg, longueur / 2], [larg, -longueur / 2]].forEach(([u, t]) => a.push(...pt(u, t)));
+    const geo = new THREE.BufferGeometry(); geo.setAttribute("position", new THREE.Float32BufferAttribute(a, 3)); geo.setIndex([0, 1, 2, 0, 2, 3]); geo.computeVertexNormals();
+    rampant = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0xf4f2ee, roughness: .9, side: THREE.DoubleSide }));
+    rampant.userData.centre = new THREE.Vector3(...pt(larg / 2, 0)); rampant.userData.normale = new THREE.Vector3(-k * ax, 1, -k * az).normalize().negate();
+    scene.add(rampant);
   }
   function construireObjets() {
     meubles.clear(); objetsMesh.clear();
@@ -534,8 +584,8 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     }
   }
   // reflets dosés : forts sur le métal et le verre, discrets ailleurs
-  function doser() { scene.traverse(m => { const mt = m.material; if (!mt || mt.userData.dose) return; mt.userData.dose = true;
-    if (mt.envMapIntensity === 1) mt.envMapIntensity = mt.metalness > .5 ? .9 : mt.roughness < .2 ? .5 : .25; }); }
+  function doser() { scene.traverse(m => { [].concat(m.material || []).forEach(mt => { if (!mt || mt.userData.dose) return; mt.userData.dose = true;
+    if (mt.envMapIntensity === 1) mt.envMapIntensity = mt.metalness > .5 ? .9 : mt.roughness < .2 ? .5 : .25; }); }); }
   // quand la pièce change de taille, chaque élément fixé au mur reste sur son mur
   function changerDims(k, valeur) {
     const ancien = { ...etat.dims }; etat.dims[k] = valeur;
@@ -576,6 +626,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     } else controles.update();
     const vis = murs.map(m => { dir.copy(camera.position).sub(m.userData.centre); return chantier || dir.dot(m.userData.normale) > 0; });
     murs.forEach((m, i) => { m.visible = vis[i]; });
+    if (rampant) { dir.copy(camera.position).sub(rampant.userData.centre); rampant.visible = !chantier && dir.dot(rampant.userData.normale) > 0; }
     meubles.children.forEach(g => { if (g.userData.mur >= 0) g.visible = vis[g.userData.mur]; g.children.forEach(m => { if (m.userData.chantierSeul) m.visible = chantier; }); });
     renderer.render(scene, camera);
     if (tournage) tournage.image();
@@ -630,7 +681,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     glisse = false; controles.enabled = true;
   });
 
-  const LIBELLES = { receveur: "Receveur", diametre: "Diamètre", ouverture: "Ouverture", couleur: "Couleur" };
+  const LIBELLES = { receveur: "Receveur", diametre: "Diamètre", ouverture: "Ouverture", couleur: "Couleur", modele: "Modèle", style: "Pose", facade: "Façade" };
   function afficherSelection() {
     const p = document.getElementById("selPanneau");
     if (selection === null || !etat.objets[selection]) { selection = null; p.hidden = true; return; }
@@ -654,9 +705,12 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
       </div>`;
   }
   const panneauSel = document.getElementById("selPanneau");
-  const refaire = () => {
-    const i = selection, o = etat.objets[i], g = CAT[o.type].faire(o.w, o.d, o.h, o);
+  function refaireIndex(i) {
+    const o = etat.objets[i], g = CAT[o.type].faire(o.w, o.d, o.h, o);
     g.userData.index = i; meubles.remove(objetsMesh.get(i)); meubles.add(g); objetsMesh.set(i, g); placer(i);
+  }
+  const refaire = () => {
+    const i = selection, o = etat.objets[i]; refaireIndex(i);
     if (o.type === "douche") construirePiece(); else majMetre();
   };
   panneauSel.addEventListener("change", e => {
@@ -706,6 +760,10 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     else if (t.id === "faience") etat.faience = t.value;
     else if (t.id === "depose") etat.depose = t.value === "1";
     else if (t.id === "accentActif") etat.accent.actif = t.checked;
+    else if (t.id === "penteMur" || t.id === "penteBasse" || t.id === "penteLarg") {
+      etat.pente = { mur: panneau.querySelector("#penteMur").value, basse: Math.max(.5, (Number(panneau.querySelector("#penteBasse").value) || 100) / 100),
+        largeur: Math.max(.3, (Number(panneau.querySelector("#penteLarg").value) || 120) / 100) };
+    }
     else return;
     construirePiece();
   });
@@ -840,6 +898,11 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
         if (sym[0]) texte(sym[0], (c.pose === "plafond" ? cx : mx), (c.pose === "plafond" ? cy : my) + 30, 18, sym[1], 700);
         return;
       }
+      if (o.type === "decroche") { // dessiné comme un morceau de mur
+        rect(o, o.w, o.d, ENCRE, ENCRE, false);
+        const [tx, ty] = coin(o, 0, o.d / 2 + .16); texte(`Décroché ${Math.round(o.w * 100)} × ${Math.round(o.d * 100)}`, tx, ty, 18, GRIS, 600);
+        return;
+      }
       const haut = EN_HAUTEUR.includes(o.type);
       rect(o, o.w, o.d, haut ? null : (o.type === "douche" ? "#e3edf0" : "#ffffff"), haut ? GRIS : ENCRE, haut);
       if (o.type === "douche") { // pente vers l'évacuation
@@ -855,6 +918,18 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
         texte(`${Math.round(o.w * 100)} × ${Math.round(o.d * 100)}`, cx, cy + taille * .7, taille * .8, GRIS, 500);
       }
     });
+    // plafond sous pente : limite de la pleine hauteur en pointillés
+    const pe = etat.pente;
+    if (pe && pe.mur && pe.mur !== "aucun") {
+      const L = pe.largeur; g.setLineDash([14, 10]); g.lineWidth = 2; g.strokeStyle = GRIS; g.beginPath();
+      if (pe.mur === "gauche") { g.moveTo(X(-l / 2 + L), Y(-p / 2)); g.lineTo(X(-l / 2 + L), Y(p / 2)); }
+      if (pe.mur === "droite") { g.moveTo(X(l / 2 - L), Y(-p / 2)); g.lineTo(X(l / 2 - L), Y(p / 2)); }
+      if (pe.mur === "fond") { g.moveTo(X(-l / 2), Y(-p / 2 + L)); g.lineTo(X(l / 2), Y(-p / 2 + L)); }
+      if (pe.mur === "devant") { g.moveTo(X(-l / 2), Y(p / 2 - L)); g.lineTo(X(l / 2), Y(p / 2 - L)); }
+      g.stroke(); g.setLineDash([]);
+      const mx = pe.mur === "gauche" ? X(-l / 2 + L / 2) : pe.mur === "droite" ? X(l / 2 - L / 2) : X(0), my = pe.mur === "fond" ? Y(-p / 2 + L / 2) : pe.mur === "devant" ? Y(p / 2 - L / 2) : Y(p / 2) - 40;
+      texte(`Sous pente ${Math.round(pe.basse * 100)} → ${Math.round(etat.dims.h * 100)} cm`, mx, my, 20, GRIS, 600);
+    }
     // élément choisi : liseré fin
     const oc = choisi !== null && etat.objets[choisi];
     if (oc && CAT[oc.type]) {
@@ -995,7 +1070,8 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
         : o[k] === "Comme la robinetterie" ? (ROBINETTERIE[etat.robinetterie]?.nom || "").toLowerCase()
         : o[k] ? (k === "receveur" ? "receveur " : "") + o[k].toLowerCase() : "").filter(Boolean);
       const taille = c.tailles && ["Sanitaires", "Meubles"].includes(c.groupe) ? ` (${Math.round(w * 100)} × ${Math.round(d * 100)} cm)` : "";
-      const paroi = o.type === "douche" ? ", paroi vitrée fixe avec profilé noir" : o.type === "wc" ? ", plaque de chasse d'eau noire" : "";
+      const paroi = o.type === "douche" ? ", paroi vitrée fixe avec profilé noir" : o.type === "wc" ? ", plaque de chasse d'eau noire"
+        : o.type === "decroche" ? ", du sol au plafond, habillé comme les murs" : "";
       return `- ${c.nom}${taille}${opts.length ? ", " + opts.join(", ") : ""}${paroi}${source === "photo" ? "" : " : " + emplacement(o)}`;
     });
     const faience = { plafond: "jusqu'au plafond", "120": "à 1,20 m de haut (jusqu'au plafond dans la douche)", douche: "seulement dans la douche" }[etat.faience];
@@ -1024,6 +1100,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
       `- Sol : ${revetement(etat.sol)}.`,
       etat.faience !== "plafond" ? `- Peinture au-dessus du carrelage : ${(PEINTURES[etat.peinture] || "").toLowerCase()}, finition mate.` : null,
       `- Robinetterie et poignées : ${(ROBINETTERIE[etat.robinetterie]?.nom || "").toLowerCase()}. Les autres éléments gardent leur couleur indiquée ci-dessous.`,
+      etat.pente && etat.pente.mur !== "aucun" ? `- Plafond sous pente (combles) côté mur ${etat.pente.mur === "fond" ? "du fond" : etat.pente.mur === "devant" ? "de devant" : "de " + etat.pente.mur} : ${Math.round(etat.pente.basse * 100)} cm de haut contre ce mur, pleine hauteur à ${Math.round(etat.pente.largeur * 100)} cm.` : null,
       "",
       photo ? "ÉQUIPEMENTS" : "ÉQUIPEMENTS ET LEUR PLACE (le mur du fond et le mur de gauche sont ceux visibles sur l'image)",
       ...equipements,
