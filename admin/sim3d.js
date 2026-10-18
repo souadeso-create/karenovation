@@ -722,16 +722,62 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
       const chute = f.sansJoint ? 0 : f.decale || grand ? .15 : .10, total = surf * (1 + chute);
       const plaque = rev.format === "5x5"; // la mosaïque se vend en plaques de 30 × 30
       const n = f.sansJoint ? 0 : Math.ceil(total / (plaque ? .09 : a * b));
-      lignes.push({ titre, matiere: MATIERES[rev.matiere]?.nom || "", format: f.nom, surf, chute, total, n, unite: plaque ? "plaques 30×30" : rev.format === "parquet" ? "lames" : "carreaux" });
+      lignes.push({ titre, cle: rev.format, joint: rev.joint, matiere: MATIERES[rev.matiere]?.nom || "", format: f.nom, surf, chute, total, n, unite: plaque ? "plaques 30×30" : rev.format === "parquet" ? "lames" : "carreaux" });
     };
     calcule("Sol", etat.sol, Math.max(0, sol));
     calcule("Murs", etat.murs, Math.max(0, m.murs - zoneAccent));
     if (etat.accent.actif) calcule("Murs de la douche", etat.accent, zoneAccent);
     return lignes;
   }
+  // Fournitures autour du carrelage, avec les ratios courants de pose (à ajuster selon la fiche du produit).
+  function fournitures() {
+    const { l, p, h } = etat.dims, hf = hauteurFaience(h), liste = [], zones = zonesDouche();
+    const sacs = (kg, sac) => Math.max(1, Math.ceil(kg / sac));
+    const n = v => (Math.ceil(v * 10) / 10).toLocaleString("fr-FR"), pl = (k, mot) => `${k} ${mot}${k > 1 ? "s" : ""}`;
+    const ajoute = (nom, qte, detail) => liste.push({ nom, qte, detail });
+    const carreaux = carrelageACommander().filter(c => c.cle !== "uni" && c.cle !== "parquet");
+    // colle : 3,5 kg/m² petits carreaux, 5 kg/m² moyens, 7 kg/m² grands formats (double encollage)
+    const colle = carreaux.reduce((a, c) => { const m = Math.max(...FORMATS[c.cle].t); return a + c.surf * (m <= .2 ? 3.5 : m <= .45 ? 5 : 7); }, 0);
+    if (colle) ajoute("Colle carrelage C2", `${pl(sacs(colle, 25), "sac")} de 25 kg`, `≈ ${Math.ceil(colle)} kg`);
+    // joint : (L + l) / (L × l) × largeur × épaisseur × 1,6, en mm
+    const joints = {};
+    carreaux.forEach(c => {
+      const [a, b] = FORMATS[c.cle].t.map(v => v * 1000), m = Math.max(a, b);
+      const larg = c.titre === "Sol" ? 3 : 2, ep = m <= 100 ? 6 : m >= 600 ? 10 : 8;
+      const kg = (a + b) / (a * b) * larg * ep * 1.6 * c.surf * 1.1;
+      joints[c.joint] = (joints[c.joint] || 0) + kg;
+    });
+    Object.entries(joints).forEach(([coul, kg]) => ajoute(`Joint ${({ blanc: "blanc", gris: "gris", noir: "noir" })[coul] || coul}`, `${pl(sacs(kg, 5), "sac")} de 5 kg`, `≈ ${n(kg)} kg`));
+    // sol : primaire puis ragréage 3 mm (1,5 kg/m²/mm)
+    const sol = l * p;
+    ajoute("Primaire d'accrochage", `${pl(Math.max(1, Math.ceil(sol * .15 / 5)), "bidon")} de 5 L`, `≈ ${n(sol * .15)} L pour le sol`);
+    ajoute("Ragréage autolissant", `${pl(sacs(sol * 4.5, 25), "sac")} de 25 kg`, "3 mm d'épaisseur");
+    if (etat.sol.format === "parquet") ajoute("Sous-couche parquet", `${Math.ceil(sol * 1.05)} m²`, "");
+    // douche : étanchéité au sol de la douche et sur ses murs jusqu'à 2 m, bande dans les angles
+    const douche = etat.objets.find(o => o.type === "douche");
+    if (douche) {
+      const lgZones = Object.values(zones).reduce((a, [x, y]) => a + (y - x), 0);
+      const spec = douche.w * douche.d + lgZones * 2;
+      ajoute("Kit d'étanchéité (SPEC)", `${n(spec)} m²`, "sol de la douche + murs sur 2 m");
+      ajoute("Bande d'angle d'étanchéité", `${Math.ceil((lgZones + Object.keys(zones).length * 2) * 1.1)} m`, "jonctions sol / murs et angles");
+    }
+    // profilés de finition : en haut de la faïence à 1,20 m, et sur les bords de la zone de douche
+    const portes = etat.objets.filter(o => o.type === "porte").reduce((a, o) => a + o.w, 0);
+    let profil = hf > 0 && hf < h ? 2 * (l + p) - portes : 0;
+    if (hf < h) Object.entries(zones).forEach(([i, [a, b]]) => { const w = i % 2 ? p : l; profil += (a > -w / 2 ? h - hf : 0) + (b < w / 2 ? h - hf : 0); });
+    if (profil > .05) ajoute("Profilés de finition", `${pl(Math.ceil(profil / 2.5), "barre")} de 2,50 m`, `${n(profil)} m`);
+    // plinthes : seulement là où le bas des murs n'est pas carrelé
+    if (hf === 0) {
+      const ml = 2 * (l + p) - portes - Object.values(zones).reduce((a, [x, y]) => a + (y - x), 0);
+      if (ml > .05) ajoute("Plinthes", `${n(ml * 1.1)} m`, "10 % de chutes compris");
+    }
+    ajoute("Silicone sanitaire", pl(douche ? 2 : 1, "cartouche"), "joints autour des sanitaires");
+    return liste;
+  }
   function majMetre() {
     const m = metre(), f = n => n.toLocaleString("fr-FR", { maximumFractionDigits: 1 });
     const ouvert = document.querySelector("#metre .deroule-carrelage")?.open, cmd = carrelageACommander();
+    const ouvertF = document.querySelector("#metre .deroule-fournitures")?.open, fourn = fournitures();
     const bloc = (v, t) => `<div><b style="font-family:var(--serif);font-size:20px;font-weight:400">${f(v)} m²</b><br><span class="gris" style="font-size:13px">${t}</span></div>`;
     document.getElementById("metre").innerHTML = `<div class="petit" style="margin-bottom:8px">Métré</div>
       <div class="deux" style="gap:12px">${bloc(m.sol, `sol · ${FORMATS[etat.sol.format].nom}`)}${bloc(m.murs, "faïence murale")}${bloc(m.peinture, "peinture murs")}${bloc(m.plafond, "plafond")}</div>
@@ -739,7 +785,12 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
       ${cmd.map(c => `<div style="display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--sable)">
         <div><b style="font-weight:600">${c.titre}</b><br><span class="gris" style="font-size:13px">${esc(c.matiere)} · ${esc(c.format)}<br>${f(c.surf)} m² posés + ${Math.round(c.chute * 100)} % de chutes</span></div>
         <div style="text-align:right;white-space:nowrap"><b style="font-family:var(--serif);font-size:20px;font-weight:400">${f(Math.ceil(c.total * 10) / 10)} m²</b>${c.n ? `<br><span class="gris" style="font-size:13px">≈ ${c.n.toLocaleString("fr-FR")} ${c.unite}</span>` : ""}</div></div>`).join("")}
-      <p class="gris" style="font-size:12px;margin-top:6px">Arrondissez au nombre de boîtes du fournisseur.</p></details>`;
+      <p class="gris" style="font-size:12px;margin-top:6px">Arrondissez au nombre de boîtes du fournisseur.</p></details>
+      <details class="groupe-ajout deroule-fournitures" style="border-bottom:0;border-top:1px solid var(--sable)" ${ouvertF ? "open" : ""}><summary>Fournitures<span>${fourn.length} articles</span></summary>
+      ${fourn.map(x => `<div style="display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--sable)">
+        <div><b style="font-weight:600">${esc(x.nom)}</b>${x.detail ? `<br><span class="gris" style="font-size:13px">${esc(x.detail)}</span>` : ""}</div>
+        <div style="text-align:right;white-space:nowrap;font-weight:600">${esc(x.qte)}</div></div>`).join("")}
+      <p class="gris" style="font-size:12px;margin-top:6px">Quantités courantes de pose : vérifiez la fiche du produit choisi.</p></details>`;
   }
 
   /* --- Sélection, déplacement au doigt --- */
