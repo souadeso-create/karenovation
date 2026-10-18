@@ -506,12 +506,15 @@ async function vueClient(id) {
           <a class="btn clair" href="#/3d?client=${c.id}">${ICO.cube}Simulation 3D</a>
           ${c.tel ? `<a class="btn discret" href="tel:${esc(c.tel.replace(/\s/g, ""))}">Appeler</a>` : ""}
         </div>
-        <h2 style="margin:8px 0 10px">Documents</h2>
+        <h2 style="margin:8px 0 10px">Carnet de chantier</h2>
+        <div id="carnet"><p class="gris">Chargement du carnet…</p></div>
+        <h2 style="margin:22px 0 10px">Documents</h2>
         <div class="liste">${docs.map(ligneDoc).join("") || '<p class="gris">Aucun devis ni facture.</p>'}</div>
         <h2 style="margin:22px 0 10px">Simulations 3D</h2>
         <div class="liste">${sims.map(s => `<a class="ligne-liste" href="#/3d?sim=${s.id}"><div><b>${esc(s.nom || "Simulation")}</b><small>${dateFr(String(s.created_at).slice(0, 10))}</small></div>${s.image ? `<img src="${s.image}" alt="" style="width:64px;height:48px;object-fit:cover;border-radius:8px">` : ""}</a>`).join("") || '<p class="gris">Aucune simulation.</p>'}</div>` : ""}
       </div>
     </div>`;
+  if (c.id) import("./carnet.js").then(m => m.monterCarnet(document.getElementById("carnet"), { db, client: c, toast, esc, erreur })).catch(erreur);
   document.getElementById("fc").onsubmit = async e => {
     e.preventDefault();
     const o = lireForm(e.target, { ...c });

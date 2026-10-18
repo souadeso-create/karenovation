@@ -100,6 +100,43 @@ export async function supprimerPhotosDemande(chemins) {
   if (error) throw error;
 }
 
+/* ---------- Carnet de chantier (photos dans le dossier privé « chantiers ») ---------- */
+export async function listerCarnet(clientId) {
+  if (MODE_ESSAI) return lireLocal("carnet").filter(x => x.client_id === clientId).sort((a, b) => a.created_at < b.created_at ? 1 : -1);
+  const { data, error } = await sb.from("carnet").select("*").eq("client_id", clientId).order("created_at", { ascending: false });
+  if (error) throw error;
+  return data;
+}
+// enregistre une entrée ; photo = Blob JPEG (facultatif)
+export async function ajouterCarnet(entree, photo) {
+  const ligne = { ...entree };
+  if (MODE_ESSAI) {
+    if (photo) ligne.image = await new Promise(ok => { const f = new FileReader(); f.onload = () => ok(f.result); f.readAsDataURL(photo); });
+    return enregistrer("carnet", ligne);
+  }
+  if (photo) {
+    const chemin = `${entree.client_id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
+    const { error } = await sb.storage.from("chantiers").upload(chemin, photo, { contentType: "image/jpeg" });
+    if (error) throw error;
+    ligne.chemin = chemin;
+  }
+  return enregistrer("carnet", ligne);
+}
+export async function urlsCarnet(lignes) {
+  const out = {};
+  if (MODE_ESSAI) { lignes.forEach(l => { if (l.image) out[l.id] = l.image; }); return out; }
+  const avec = lignes.filter(l => l.chemin);
+  if (!avec.length) return out;
+  const { data, error } = await sb.storage.from("chantiers").createSignedUrls(avec.map(l => l.chemin), 3600);
+  if (error) throw error;
+  data.forEach((d, i) => { if (d.signedUrl) out[avec[i].id] = d.signedUrl; });
+  return out;
+}
+export async function supprimerCarnet(ligne) {
+  if (!MODE_ESSAI && ligne.chemin) { const { error } = await sb.storage.from("chantiers").remove([ligne.chemin]); if (error) throw error; }
+  return supprimer("carnet", ligne.id);
+}
+
 /* ---------- Paramètres de l'entreprise ---------- */
 export async function parametres() {
   let p;
@@ -140,5 +177,6 @@ export async function exporterTout() {
   for (const t of tables) out[t] = await lister(t);
   try { out.demandes = await lister("demandes"); } catch { /* table pas encore créée */ }
   try { out.receptions = await lister("receptions"); } catch { /* table pas encore créée */ }
+  try { out.carnet = await lister("carnet"); } catch { /* table pas encore créée */ }
   return out;
 }
