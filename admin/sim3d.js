@@ -401,7 +401,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
           <button class="btn clair" id="devisSim">Créer le devis</button>
           <button class="btn clair" id="imageSim">Image</button>
           <button class="btn clair" id="videoSim">Vidéo</button>
-          <button class="btn discret" id="gptSim">Image réaliste avec ChatGPT</button>
+          <button class="btn discret" id="gptSim">Image réaliste avec Gemini</button>
           <button class="btn clair" id="plan2d">Plan 2D</button>
           <button class="btn discret" id="vueDessus">Vue de dessus</button>
           <button class="btn discret" id="modeChantier">Mode chantier</button>
@@ -962,21 +962,33 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     };
   };
 
-  /* --- ChatGPT (en option, avec le compte de l'artisan) : on prépare le texte et l'image, il colle et envoie --- */
+  /* --- Gemini (en option, avec le compte de l'artisan) : on prépare le texte et l'image, il colle et envoie --- */
   const metres = v => String(Math.round(v * 100) / 100).replace(".", ",") + " m";
   const revetement = r => `${MATIERES[r.matiere].nom.toLowerCase()}, format ${FORMATS[r.format].nom}, joints ${({ blanc: "blancs", gris: "gris", noir: "noirs" })[r.joint]}`;
-  function descriptionChatGPT(source) {
+  // place de chaque élément, telle qu'on la voit sur l'image 3D (vue de face : mur du fond et mur de gauche visibles)
+  const NOMS_MURS = ["sur le mur du fond", "sur le mur de droite", "sur le mur de devant", "sur le mur de gauche"];
+  function emplacement(o) {
+    const c = CAT[o.type], { l, p } = etat.dims, tx = (o.x + l / 2) / l, tz = (o.z + p / 2) / p;
+    const long = t => t < .34 ? "à gauche" : t > .66 ? "à droite" : "au milieu", prof = t => t < .34 ? "côté fond" : t > .66 ? "côté devant" : "au milieu";
+    if (c.pose === "mur" || c.pose === "dansMur") { const k = murDe(o.rot); return `${NOMS_MURS[k]}, ${k === 0 || k === 2 ? long(tx) : prof(tz)}`; }
+    const [ex, ez] = encombrement(o), marge = .12;
+    const murs = [o.z - ez < -p / 2 + marge && "fond", o.x + ex > l / 2 - marge && "droite", o.z + ez > p / 2 - marge && "devant", o.x - ex < -l / 2 + marge && "gauche"].filter(Boolean);
+    if (murs.length >= 2) return `dans l'angle ${murs.slice(0, 2).join("-")}`;
+    if (murs.length === 1) return `contre le mur ${murs[0] === "fond" ? "du fond" : "de " + murs[0]}`;
+    return "au centre de la pièce";
+  }
+  function descriptionIA(source) {
     const { l, p, h } = etat.dims;
     const equipements = etat.objets.filter(o => CAT[o.type].groupe !== "Réseaux").map(o => {
       const c = CAT[o.type], w = o.w ?? c.dims[0] / 100, d = o.d ?? c.dims[1] / 100;
       const opts = Object.keys(c.options || {}).map(k => k === "finition" ? (BOIS[o[k]] || "").toLowerCase() : o[k] ? (k === "receveur" ? "receveur " : "") + o[k].toLowerCase() : "").filter(Boolean);
       const taille = c.tailles && ["Sanitaires", "Meubles"].includes(c.groupe) ? ` (${Math.round(w * 100)} × ${Math.round(d * 100)} cm)` : "";
-      return `- ${c.nom}${taille}${opts.length ? ", " + opts.join(", ") : ""}`;
+      return `- ${c.nom}${taille}${opts.length ? ", " + opts.join(", ") : ""}${source === "photo" ? "" : " : " + emplacement(o)}`;
     });
     const faience = { plafond: "jusqu'au plafond", "120": "à 1,20 m de haut (jusqu'au plafond dans la douche)", douche: "seulement dans la douche" }[etat.faience];
     const debut = source === "photo"
       ? "Voici la photo de la salle de bain actuelle de mon client. Montre-moi cette même pièce rénovée, en photo réaliste, avec le même point de vue : garde les murs, la fenêtre, la porte et les proportions de la photo."
-      : "Voici une vue 3D de la salle de bain que nous allons réaliser. Transforme-la en photo réaliste, comme prise par un photographe d'intérieur, en gardant exactement la disposition, les proportions et l'emplacement de chaque élément.";
+      : "Voici une vue 3D de la salle de bain que nous allons réaliser. Transforme-la en photo réaliste, comme prise par un photographe d'intérieur, avec le même point de vue. Respecte strictement la place de chaque élément : ne déplace rien d'un mur à l'autre.";
     return [debut, "",
       `Pièce : ${metres(l)} × ${metres(p)}, hauteur ${metres(h)}.`,
       `Carrelage mural ${faience} : ${revetement(etat.murs)}.`,
@@ -984,28 +996,28 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
       `Sol : ${revetement(etat.sol)}.`,
       etat.faience !== "plafond" ? `Peinture au-dessus du carrelage : ${(PEINTURES[etat.peinture] || "").toLowerCase()}.` : "",
       `Robinetterie et poignées : ${(ROBINETTERIE[etat.robinetterie]?.nom || "").toLowerCase()}.`,
-      "", "Équipements :", ...equipements, "",
+      "", source === "photo" ? "Équipements :" : "Équipements et leur place (mur du fond et mur de gauche visibles sur l'image) :", ...equipements, "",
       "Lumière naturelle douce, rendu haut de gamme, sans texte, sans logo et sans personne."].filter((x, i, t) => x !== "" || (t[i - 1] !== "" && i > 0)).join("\n");
   }
   document.getElementById("gptSim").onclick = () => {
     const v = document.createElement("div"); v.className = "voile";
-    v.innerHTML = `<div class="fenetre" role="dialog" aria-modal="true"><div class="tete"><h2>Image réaliste avec ChatGPT</h2><button class="icone" data-fermer aria-label="Fermer">✕</button></div>
-      <p class="gris" style="font-size:14px;margin-bottom:12px">Avec le compte ChatGPT de l'artisan : copiez le texte, ouvrez ChatGPT, collez-le et joignez l'image. Le résultat est une image d'illustration : les dimensions et les détails ne sont pas exacts.</p>
+    v.innerHTML = `<div class="fenetre" role="dialog" aria-modal="true"><div class="tete"><h2>Image réaliste avec Gemini</h2><button class="icone" data-fermer aria-label="Fermer">✕</button></div>
+      <p class="gris" style="font-size:14px;margin-bottom:12px">Avec le compte Gemini de l'artisan : copiez le texte, ouvrez Gemini, collez-le et joignez l'image. Le résultat est une image d'illustration : les dimensions et les détails ne sont pas exacts.</p>
       <div class="champ"><label>À partir de</label><select id="gptSource"><option value="3d">L'image de la simulation 3D</option><option value="photo">La photo de la pièce du client</option></select></div>
       <textarea id="gptTexte" rows="12" style="font-size:13px;margin:8px 0 12px"></textarea>
       <div class="actions-doc" style="margin:0">
         <button class="btn" id="gptCopier">1. Copier le texte</button>
         <button class="btn clair" id="gptImage">2. Enregistrer l'image 3D</button>
-        <a class="btn clair" href="https://chatgpt.com/" target="_blank" rel="noopener">3. Ouvrir ChatGPT</a>
+        <a class="btn clair" href="https://gemini.google.com/" target="_blank" rel="noopener">3. Ouvrir Gemini</a>
       </div></div>`;
     document.body.appendChild(v);
     const texte = v.querySelector("#gptTexte"), source = v.querySelector("#gptSource"), btnImage = v.querySelector("#gptImage");
-    const remplir = () => { texte.value = descriptionChatGPT(source.value); btnImage.hidden = source.value === "photo"; };
+    const remplir = () => { texte.value = descriptionIA(source.value); btnImage.hidden = source.value === "photo"; };
     remplir(); source.onchange = remplir;
     v.addEventListener("click", e => { if (e.target === v || e.target.closest("[data-fermer]")) v.remove(); });
     v.querySelector("#gptCopier").onclick = async () => {
       try { await navigator.clipboard.writeText(texte.value); } catch { texte.select(); document.execCommand("copy"); }
-      toast("Texte copié ✓ : collez-le dans ChatGPT");
+      toast("Texte copié ✓ : collez-le dans Gemini");
     };
     btnImage.onclick = async () => {
       const blob = await (await fetch(image(1600))).blob();
