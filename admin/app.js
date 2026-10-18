@@ -92,7 +92,7 @@ async function vueAccueil() {
   const encaisse = docs.filter(d => d.type === "facture" && d.statut === "paye" && String(d.date).slice(0, 7) === mois);
   const somme = l => l.reduce((a, d) => a + totaux(d).ht, 0);
   vue.innerHTML = `
-    <div class="entete"><div><div class="petit">Bonjour</div><h1>Tableau de bord</h1></div></div>
+    <div class="entete"><div><div class="petit">Bonjour</div><h1>Tableau de bord</h1></div><a class="btn discret petit-btn" href="#/tuto">▶ Tuto vidéo</a></div>
     <div class="stats">
       <div class="stat"><span class="petit">Devis en attente</span><b>${devisAttente.length}</b><small class="gris">${eur(somme(devisAttente))} €</small></div>
       <div class="stat"><span class="petit">À encaisser</span><b>${eur(aEncaisser.reduce((a, d) => a + totaux(d).reste, 0))} €</b><small class="gris">${aEncaisser.length} facture(s)</small></div>
@@ -717,10 +717,18 @@ function installerAppli() {
     : `<ol class="etapes-install"><li>Ouvrez cette page dans <b>Chrome</b>.</li><li>Touchez les <b>trois points</b> en haut à droite.</li><li>Choisissez <b>Ajouter à l'écran d'accueil</b> (ou <b>Installer l'application</b>), puis <b>Installer</b>.</li></ol><p class="gris" style="font-size:14px">L'icône KA apparaît à côté de vos applis : un toucher, et l'admin s'ouvre en plein écran.</p>`);
 }
 
+function vueTuto() {
+  vue.innerHTML = `
+    <div class="entete"><div><div class="petit">Tuto</div><h1>Prendre en main l'appli</h1></div></div>
+    <video class="video-tuto" src="../medias/tuto-appli.mp4" poster="../medias/tuto-appli.jpg" controls playsinline preload="metadata"></video>
+    <p class="gris" style="font-size:14px;margin-top:12px;max-width:440px">De la demande du client à la réception des travaux, en 1 min 20 : la 3D, les choix du client, le devis, l'agenda, le carnet de chantier, les dépenses, les paiements et le PV.</p>`;
+}
+
 function vuePlus() {
   vue.innerHTML = `
     <div class="entete"><h1>Plus</h1></div>
     <div class="liste">
+      <a class="ligne-liste" href="#/tuto"><div><b>Tuto vidéo</b><small>Prendre en main l'appli, de la demande à la réception des travaux</small></div><span class="gris">›</span></a>
       ${dejaInstallee() ? "" : `<button class="ligne-liste" id="installer" style="border:0;text-align:left;width:100%;cursor:pointer"><div><b>Mettre l'appli sur le téléphone</b><small>Une icône KA sur l'écran d'accueil, pour ouvrir l'admin en un toucher</small></div><span class="gris">›</span></button>`}
       <a class="ligne-liste" href="#/3d"><div><b>Simulation 3D</b><small>Montrer au client sa future salle de bain</small></div><span class="gris">›</span></a>
       <a class="ligne-liste" href="#/reglages"><div><b>Réglages</b><small>Entreprise, IBAN, numérotation, conditions</small></div><span class="gris">›</span></a>
@@ -828,7 +836,7 @@ async function routeur() {
   const [chemin, requete] = (location.hash.slice(2) || "accueil").split("?");
   const params = new URLSearchParams(requete || "");
   const [r, a, b] = chemin.split("/");
-  nav.querySelectorAll("a").forEach(x => x.classList.toggle("actif", x.dataset.r === r || (r === "document" && x.dataset.r === "documents") || (r === "client" && x.dataset.r === "clients") || (r === "demande" && x.dataset.r === "demandes") || (r === "reception" && x.dataset.r === "documents") || (["3d", "reglages"].includes(r) && x.dataset.r === "plus")));
+  nav.querySelectorAll("a").forEach(x => x.classList.toggle("actif", x.dataset.r === r || (r === "document" && x.dataset.r === "documents") || (r === "client" && x.dataset.r === "clients") || (r === "demande" && x.dataset.r === "demandes") || (r === "reception" && x.dataset.r === "documents") || (["3d", "reglages", "tuto"].includes(r) && x.dataset.r === "plus")));
   window.scrollTo(0, 0);
   try {
     if (r === "accueil") await vueAccueil();
@@ -840,6 +848,7 @@ async function routeur() {
     else if (r === "client") await vueClient(a, params);
     else if (r === "prestations") await vuePrestations();
     else if (r === "plus") vuePlus();
+    else if (r === "tuto") vueTuto();
     else if (r === "reglages") vueReglages();
     else if (r === "3d") await vue3D(params);
     else if (r === "reception") { const { vueReception } = await import("./reception.js"); await vueReception(vue, { db, docId: a, P, toast, esc, erreur, envoyerMessage }); }
