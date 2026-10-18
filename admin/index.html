@@ -129,6 +129,9 @@
   .note-carnet.faite span { text-decoration: line-through; color: var(--gris); }
   .ligne-bilan { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-top: 1px solid var(--pierre); font-size: 14px; }
   .ligne-bilan.total { font-weight: 600; border-top-color: var(--sable); }
+  .ligne-bilan span:first-child { flex: 1; min-width: 0; }
+  .ligne-bilan a { color: inherit; }
+  .barre-dep { display: block; height: 4px; background: var(--encre); opacity: .18; border-radius: 4px; margin-top: 4px; }
   .lien-ticket { background: none; border: 0; padding: 0; color: var(--gris); text-decoration: underline; font: inherit; font-size: 13px; cursor: pointer; }
   .vignette em { position: absolute; left: 6px; right: 6px; top: 6px; background: rgba(255,255,255,.88); color: var(--encre); font-style: normal; font-size: 11px; padding: 2px 7px; border-radius: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .detail-ligne { font-size: 13px; color: var(--gris); margin-top: 6px; }

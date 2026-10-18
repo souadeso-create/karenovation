@@ -8,7 +8,7 @@ const TYPES = {
   imprevu: { nom: "Imprévu", bouton: "+ Imprévu", aide: "Tuyau en plomb derrière le carrelage, à remplacer" },
   depense: { nom: "Dépense", bouton: "+ Dépense", aide: "Colle et joints chez le fournisseur" }
 };
-const CATEGORIES = { fournitures: "Fournitures et consommables", carburant: "Carburant", peage: "Péage et parking", location: "Location de matériel",
+export const CATEGORIES = { fournitures: "Fournitures et consommables", carburant: "Carburant", peage: "Péage et parking", location: "Location de matériel",
   decharge: "Déchetterie", outillage: "Outillage", soustraitance: "Sous-traitance", repas: "Repas", autre: "Autre" };
 const eur = n => (Number(n) || 0).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const estPhoto = l => (l.chemin || l.image) && l.type !== "depense";

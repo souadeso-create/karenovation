@@ -122,6 +122,14 @@ export async function ajouterCarnet(entree, photo) {
   }
   return enregistrer("carnet", ligne);
 }
+// toutes les dépenses du carnet, tous chantiers confondus (sans les photos)
+export async function listerDepenses() {
+  if (MODE_ESSAI) return lireLocal("carnet").filter(x => x.type === "depense").map(({ image, ...x }) => x);
+  let r = await sb.from("carnet").select("id,client_id,created_at,montant,categorie,texte").eq("type", "depense");
+  if (r.error) r = await sb.from("carnet").select("id,client_id,created_at,montant,texte").eq("type", "depense");
+  if (r.error) throw r.error;
+  return r.data;
+}
 export async function urlsCarnet(lignes) {
   const out = {};
   if (MODE_ESSAI) { lignes.forEach(l => { if (l.image) out[l.id] = l.image; }); return out; }

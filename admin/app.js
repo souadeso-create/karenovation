@@ -2,6 +2,7 @@
 import * as db from "./store.js";
 import { UNITES } from "./donnees.js";
 import { telechargerPDF, totaux, eur } from "./pdf.js";
+import { CATEGORIES } from "./carnet.js";
 
 const vue = document.getElementById("vue");
 const nav = document.getElementById("nav");
@@ -80,7 +81,7 @@ function confirmer(message, oui = "Confirmer") {
 
 /* =================== Accueil =================== */
 async function vueAccueil() {
-  const [docs, clients, demandes] = await Promise.all([db.lister("documents"), db.lister("clients"), listerDemandes()]);
+  const [docs, clients, demandes, depenses] = await Promise.all([db.lister("documents"), db.lister("clients"), listerDemandes(), db.listerDepenses().catch(() => [])]);
   const nouvelles = (demandes || []).filter(x => x.statut === "nouvelle");
   const relances = docs.filter(aRelancer);
   const devisAttente = docs.filter(d => d.type === "devis" && ["brouillon", "envoye"].includes(d.statut));
@@ -96,6 +97,7 @@ async function vueAccueil() {
       <div class="stat"><span class="petit">Encaissé ce mois</span><b>${eur(somme(encaisse))} €</b></div>
       <div class="stat"><span class="petit">Clients</span><b>${clients.length}</b></div>
     </div>
+    ${blocDepenses(depenses, clients, mois)}
     ${nouvelles.length ? `<a class="alerte" href="#/demandes">${ICO.boite}<span><b>${nouvelles.length} nouvelle${nouvelles.length > 1 ? "s" : ""} demande${nouvelles.length > 1 ? "s" : ""} de devis</b><small>${esc(nouvelles.slice(0, 3).map(x => x.nom).join(", "))}</small></span><span>›</span></a>` : ""}
     ${relances.length ? `<h2 style="margin-bottom:12px">À relancer</h2>
     <p class="gris" style="font-size:14px;margin:-6px 0 12px">Devis envoyés il y a plus de 7 jours, toujours sans réponse.</p>
@@ -116,6 +118,32 @@ async function vueAccueil() {
     try { await db.enregistrer("documents", { ...d }); } catch (er) { erreur(er); } // repart pour 7 jours
     b.closest(".ligne-liste").remove(); toast("Relance envoyée ✓");
   };
+}
+
+// Dépenses notées dans les carnets de chantier, pour le mois choisi : par catégorie et par chantier
+function blocDepenses(depenses, clients, moisChoisi) {
+  if (!depenses.length) return "";
+  const moisDispo = [...new Set([moisChoisi, ...depenses.map(x => String(x.created_at).slice(0, 7))])].sort().reverse();
+  const nomMois = m => new Date(m + "-15").toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+  const dessiner = m => {
+    const l = depenses.filter(x => String(x.created_at).slice(0, 7) === m), total = l.reduce((a, x) => a + (Number(x.montant) || 0), 0);
+    const grouper = cle => { const g = {}; l.forEach(x => { const k = cle(x); g[k] = (g[k] || 0) + (Number(x.montant) || 0); }); return Object.entries(g).sort((a, b) => b[1] - a[1]); };
+    const parCat = grouper(x => x.categorie || "autre"), parChantier = grouper(x => x.client_id);
+    const barre = (nom, v, lien) => `<div class="ligne-bilan"><span>${lien ? `<a href="${lien}">${esc(nom)}</a>` : esc(nom)}<i class="barre-dep" style="width:${total ? Math.max(4, v / total * 100) : 0}%"></i></span><span>${eur(v)} €</span></div>`;
+    return `<div class="ligne-bilan total" style="border-top:0"><span>Total du mois</span><span>${eur(total)} €</span></div>
+      ${l.length ? `<div class="petit" style="margin:14px 0 4px">Par catégorie</div>${parCat.map(([k, v]) => barre(CATEGORIES[k] || "Autre", v)).join("")}
+      <div class="petit" style="margin:14px 0 4px">Par chantier</div>${parChantier.map(([id, v]) => { const c = clients.find(x => x.id === id); return barre(c ? nomClient(c) : "Client archivé", v, c ? `#/client/${id}` : ""); }).join("")}`
+      : '<p class="gris" style="font-size:14px">Aucune dépense ce mois-ci.</p>'}`;
+  };
+  setTimeout(() => {
+    const s = document.getElementById("moisDep"), z = document.getElementById("zoneDep");
+    if (s) s.onchange = () => { z.innerHTML = dessiner(s.value); };
+  });
+  return `<div class="carte" style="margin-bottom:22px">
+    <div class="entete" style="margin-bottom:6px"><h2>Dépenses des chantiers</h2>
+      <select id="moisDep" style="width:auto">${moisDispo.map(m => `<option value="${m}">${nomMois(m)}</option>`).join("")}</select></div>
+    <div id="zoneDep">${dessiner(moisChoisi)}</div>
+    <p class="gris" style="font-size:12px;margin-top:8px">Notées dans le carnet de chantier de chaque client (+ Dépense).</p></div>`;
 }
 
 function ligneDoc(d) {
