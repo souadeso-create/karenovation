@@ -185,7 +185,7 @@ function tube(a, b, r, m) {
    Chaque modèle est dessiné centré en x, dos vers z- , posé au sol (y = 0).
    pose : "sol", "mur" (contre le mur le plus proche), "dansMur" (porte, fenêtre, réseaux : caché avec son mur), "plafond". */
 const CAT = {
-  decroche: { nom: "Décroché / coffrage", groupe: "Structure", pose: "sol", dims: [40, 30, 250], tailles: [[30, 30], [40, 30], [60, 20], [100, 60], [120, 90]],
+  decroche: { nom: "Décroché (gaine, coffrage)", groupe: "Structure", pose: "sol", dims: [40, 30, 250], tailles: [[30, 30], [40, 30], [60, 20], [100, 60], [120, 90]],
     faire(w, d) { // du sol au plafond, habillé comme les murs (gaine, poteau, coffrage, retour de mur pour une pièce en L)
       const g = new THREE.Group(), h = AMBIANCE.h, hf = AMBIANCE.faience === "plafond" ? h : AMBIANCE.faience === "120" ? 1.2 : 0;
       const peint = new THREE.MeshStandardMaterial({ color: new THREE.Color(AMBIANCE.peinture), roughness: .9 });
