@@ -867,7 +867,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     return { versPiece: (px, py) => [(px - ox) / ech - l / 2, (py - oy) / ech - p / 2], ech };
   }
   // élément sous le doigt, en mètres dans la pièce (les éléments en hauteur passent après ceux au sol)
-  function objetSous(x, z) {
+  function objetSousPlan(x, z) {
     let trouve = null, meilleur = Infinity;
     etat.objets.forEach((o, i) => {
       const c = CAT[o.type]; if (!c) return;
@@ -921,7 +921,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     redessiner();
     const pointPiece = e => { const r = cv.getBoundingClientRect(); return repere.versPiece((e.clientX - r.left) * cv.width / r.width, (e.clientY - r.top) * cv.height / r.height); };
     cv.addEventListener("pointerdown", e => {
-      const [x, z] = pointPiece(e); choisi = objetSous(x, z);
+      const [x, z] = pointPiece(e); choisi = objetSousPlan(x, z);
       if (choisi !== null) { const o = etat.objets[choisi]; glisse = { dx: x - o.x, dz: z - o.z }; cv.setPointerCapture(e.pointerId); cv.style.cursor = "grabbing"; }
       selection = choisi; afficherSelection(); redessiner();
     });
