@@ -156,7 +156,7 @@ const MAT = {
   noir: new THREE.MeshStandardMaterial({ color: 0x1d1d1f, roughness: .45, metalness: .3 }),
   chrome: new THREE.MeshStandardMaterial({ color: 0xc9cccf, roughness: .15, metalness: .9 }),
   robinet: new THREE.MeshStandardMaterial({ color: 0x1d1d1f, roughness: .45, metalness: .3 }),
-  verre: new THREE.MeshPhysicalMaterial({ color: 0xdfeff0, roughness: .05, transmission: .9, transparent: true, opacity: .3 }),
+  verre: new THREE.MeshPhysicalMaterial({ color: 0xcfe6ea, roughness: .04, metalness: .1, transparent: true, opacity: .32, envMapIntensity: 1.2, side: THREE.DoubleSide }),
   vitre: new THREE.MeshStandardMaterial({ color: 0xbfe0f0, emissive: 0xa6d4ec, emissiveIntensity: .6, transparent: true, opacity: .75 }),
   miroir: new THREE.MeshStandardMaterial({ color: 0xd7dfe2, roughness: .08, metalness: .15, emissive: 0x2a3033, emissiveIntensity: .25 }),
   led: new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xfff4dc, emissiveIntensity: 1.6 }),
@@ -191,8 +191,13 @@ const CAT = {
       const m = o.receveur === "Blanc" ? MAT.receveurBlanc : o.receveur === "Carrelé" ? null : MAT.receveurNoir;
       if (m) g.add(pose(boite(w, .03, d, m), 0, .015, 0));
       g.add(pose(boite(w * .6, .005, .05, MAT.chrome), 0, .033, -d / 2 + .1));
-      g.add(pose(new THREE.Mesh(new THREE.BoxGeometry(.01, h, d), MAT.verre), w / 2, h / 2, 0));
-      g.add(pose(boite(.02, .02, d, MAT.noir), w / 2, h, 0));
+      // paroi vitrée fixe : sur un côté (droite ou gauche) ou devant ; « placer » montre celle qui donne sur la pièce
+      [["droite", w / 2, 0, .01, d], ["gauche", -w / 2, 0, .01, d], ["devant", -w * .2, d / 2, w * .6, .01]].forEach(([nom, x, z, lx, lz]) => {
+        const p2 = new THREE.Group(); p2.userData.paroi = nom;
+        p2.add(pose(new THREE.Mesh(new THREE.BoxGeometry(lx, h, lz), MAT.verre), x, h / 2, z));
+        p2.add(pose(boite(Math.max(lx, .02), .02, Math.max(lz, .02), MAT.noir), x, h, z));
+        g.add(p2);
+      });
       g.add(pose(cyl(.012, 1.1, MAT.robinet), -w * .1, 1.45, -d / 2 + .03));
       const bras = cyl(.01, .3, MAT.robinet); bras.rotation.x = Math.PI / 2; g.add(pose(bras, -w * .1, 2, -d / 2 + .16));
       g.add(pose(boite(.25, .012, .25, MAT.robinet), -w * .1, 1.99, -d / 2 + .28));
@@ -260,10 +265,10 @@ const CAT = {
   laveLinge: { nom: "Lave-linge", groupe: "Équipements", pose: "mur", dims: [60, 60, 85],
     faire(w, d, h) { const g = new THREE.Group(); g.add(pose(boite(w, h, d, MAT.plastique), 0, h / 2, 0));
       g.add(pose(new THREE.Mesh(new THREE.CircleGeometry(.19, 32), MAT.lingeFace), 0, h * .45, d / 2 + .002)); return g; } },
-  radiateur: { nom: "Sèche-serviettes", groupe: "Équipements", pose: "mur", dims: [50, 8, 120], tailles: [[50, 8], [60, 8]], hauteur: 40,
-    faire(w, d, h) { const g = new THREE.Group();
-      [-w / 2 + .02, w / 2 - .02].forEach(x => g.add(pose(cyl(.015, h, MAT.blanc), x, h / 2, 0)));
-      for (let y = .05; y < h; y += .085) { const b = cyl(.01, w - .04, MAT.blanc); b.rotation.z = Math.PI / 2; g.add(pose(b, 0, y, 0)); }
+  radiateur: { nom: "Sèche-serviettes", groupe: "Équipements", pose: "mur", dims: [50, 8, 120], tailles: [[50, 8], [60, 8]], hauteur: 40, options: { couleur: ["Blanc", "Comme la robinetterie"] },
+    faire(w, d, h, o) { const g = new THREE.Group(), m = o?.couleur === "Blanc" ? MAT.blanc : MAT.robinet;
+      [-w / 2 + .02, w / 2 - .02].forEach(x => g.add(pose(cyl(.015, h, m), x, h / 2, 0)));
+      for (let y = .05; y < h; y += .085) { const b = cyl(.01, w - .04, m); b.rotation.z = Math.PI / 2; g.add(pose(b, 0, y, 0)); }
       return g; } },
   radiateurEau: { nom: "Radiateur", groupe: "Équipements", pose: "mur", dims: [80, 10, 60], hauteur: 15,
     faire(w, d, h) { const g = new THREE.Group(); for (let x = -w / 2 + .03; x < w / 2; x += .06) g.add(pose(boite(.045, h, d, MAT.blanc), x + .02, h / 2, 0)); return g; } },
@@ -303,10 +308,10 @@ const CAT = {
   prise: { nom: "Prise électrique", groupe: "Réseaux", pose: "dansMur", dims: [8, 2, 8], hauteur: 105,
     faire() { const g = new THREE.Group(); g.add(pose(boite(.08, .08, .015, MAT.plastique), 0, .04, .008));
       const t = cyl(.022, .005, new THREE.MeshStandardMaterial({ color: 0xdedcd6 }), 20); t.rotation.x = Math.PI / 2; g.add(pose(t, 0, .04, .017));
-      g.add(tube(new THREE.Vector3(0, .08, -.005), new THREE.Vector3(0, 1.6, -.005), .006, MAT.gaine)); return g; } },
+      const gn = tube(new THREE.Vector3(0, .08, -.005), new THREE.Vector3(0, 1.6, -.005), .006, MAT.gaine); gn.userData.chantierSeul = true; g.add(gn); return g; } },
   interrupteur: { nom: "Interrupteur", groupe: "Réseaux", pose: "dansMur", dims: [8, 2, 8], hauteur: 110,
     faire() { const g = new THREE.Group(); g.add(pose(boite(.08, .08, .015, MAT.plastique), 0, .04, .008)); g.add(pose(boite(.04, .05, .01, MAT.blanc), 0, .04, .018));
-      g.add(tube(new THREE.Vector3(0, .08, -.005), new THREE.Vector3(0, 1.3, -.005), .006, MAT.gaine)); return g; } },
+      const gn = tube(new THREE.Vector3(0, .08, -.005), new THREE.Vector3(0, 1.3, -.005), .006, MAT.gaine); gn.userData.chantierSeul = true; g.add(gn); return g; } },
   vmc: { nom: "Bouche VMC", groupe: "Réseaux", pose: "dansMur", dims: [15, 2, 15], hauteur: 220,
     faire() { const g = new THREE.Group(), b = cyl(.075, .02, MAT.plastique, 24); b.rotation.x = Math.PI / 2; g.add(pose(b, 0, .075, .01)); return g; } },
   spot: { nom: "Spot LED (plafond)", groupe: "Réseaux", pose: "plafond", dims: [8, 8, 2],
@@ -401,7 +406,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
           <button class="btn clair" id="devisSim">Créer le devis</button>
           <button class="btn clair" id="imageSim">Image</button>
           <button class="btn clair" id="videoSim">Vidéo</button>
-          <button class="btn discret" id="gptSim">Image réaliste avec Gemini</button>
+          <button class="btn discret" id="gptSim">Image réaliste (Gemini, ChatGPT)</button>
           <button class="btn clair" id="plan2d">Plan 2D</button>
           <button class="btn discret" id="vueDessus">Vue de dessus</button>
           <button class="btn discret" id="modeChantier">Mode chantier</button>
@@ -522,6 +527,11 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     g.position.set(o.x, c.pose === "plafond" ? h - .01 : (o.y || 0), o.z);
     g.rotation.y = o.rot;
     g.userData.mur = c.pose === "dansMur" ? murDe(o.rot) : -1;
+    if (o.type === "douche") { // la paroi va du côté ouvert de la douche
+      const cs = Math.cos(o.rot), sn = Math.sin(o.rot), libre = (a, b) => { const x = o.x + cs * a + sn * b, z = o.z - sn * a + cs * b; return Math.min(l / 2 - Math.abs(x), p / 2 - Math.abs(z)) > .08; };
+      const cote = libre(o.w / 2, 0) && !libre(-o.w / 2, 0) ? "droite" : libre(-o.w / 2, 0) && !libre(o.w / 2, 0) ? "gauche" : libre(o.w / 2, 0) ? "droite" : "devant";
+      o.paroi = cote; g.children.forEach(ch => { if (ch.userData.paroi) ch.visible = ch.userData.paroi === cote; });
+    }
   }
   // reflets dosés : forts sur le métal et le verre, discrets ailleurs
   function doser() { scene.traverse(m => { const mt = m.material; if (!mt || mt.userData.dose) return; mt.userData.dose = true;
@@ -566,7 +576,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     } else controles.update();
     const vis = murs.map(m => { dir.copy(camera.position).sub(m.userData.centre); return chantier || dir.dot(m.userData.normale) > 0; });
     murs.forEach((m, i) => { m.visible = vis[i]; });
-    meubles.children.forEach(g => { if (g.userData.mur >= 0) g.visible = vis[g.userData.mur]; });
+    meubles.children.forEach(g => { if (g.userData.mur >= 0) g.visible = vis[g.userData.mur]; g.children.forEach(m => { if (m.userData.chantierSeul) m.visible = chantier; }); });
     renderer.render(scene, camera);
     if (tournage) tournage.image();
     requestAnimationFrame(boucle);
@@ -620,7 +630,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     glisse = false; controles.enabled = true;
   });
 
-  const LIBELLES = { receveur: "Receveur", diametre: "Diamètre", ouverture: "Ouverture" };
+  const LIBELLES = { receveur: "Receveur", diametre: "Diamètre", ouverture: "Ouverture", couleur: "Couleur" };
   function afficherSelection() {
     const p = document.getElementById("selPanneau");
     if (selection === null || !etat.objets[selection]) { selection = null; p.hidden = true; return; }
@@ -977,47 +987,83 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     if (murs.length === 1) return `contre le mur ${murs[0] === "fond" ? "du fond" : "de " + murs[0]}`;
     return "au centre de la pièce";
   }
-  function descriptionIA(source) {
+  function descriptionIA(source, format = "image") {
     const { l, p, h } = etat.dims;
     const equipements = etat.objets.filter(o => CAT[o.type].groupe !== "Réseaux").map(o => {
       const c = CAT[o.type], w = o.w ?? c.dims[0] / 100, d = o.d ?? c.dims[1] / 100;
-      const opts = Object.keys(c.options || {}).map(k => k === "finition" ? (BOIS[o[k]] || "").toLowerCase() : o[k] ? (k === "receveur" ? "receveur " : "") + o[k].toLowerCase() : "").filter(Boolean);
+      const opts = Object.keys(c.options || {}).map(k => k === "finition" ? (BOIS[o[k]] || "").toLowerCase()
+        : o[k] === "Comme la robinetterie" ? (ROBINETTERIE[etat.robinetterie]?.nom || "").toLowerCase()
+        : o[k] ? (k === "receveur" ? "receveur " : "") + o[k].toLowerCase() : "").filter(Boolean);
       const taille = c.tailles && ["Sanitaires", "Meubles"].includes(c.groupe) ? ` (${Math.round(w * 100)} × ${Math.round(d * 100)} cm)` : "";
-      return `- ${c.nom}${taille}${opts.length ? ", " + opts.join(", ") : ""}${source === "photo" ? "" : " : " + emplacement(o)}`;
+      const paroi = o.type === "douche" ? ", paroi vitrée fixe avec profilé noir" : o.type === "wc" ? ", plaque de chasse d'eau noire" : "";
+      return `- ${c.nom}${taille}${opts.length ? ", " + opts.join(", ") : ""}${paroi}${source === "photo" ? "" : " : " + emplacement(o)}`;
     });
     const faience = { plafond: "jusqu'au plafond", "120": "à 1,20 m de haut (jusqu'au plafond dans la douche)", douche: "seulement dans la douche" }[etat.faience];
-    const debut = source === "photo"
-      ? "Voici la photo de la salle de bain actuelle de mon client. Montre-moi cette même pièce rénovée, en photo réaliste, avec le même point de vue : garde les murs, la fenêtre, la porte et les proportions de la photo."
-      : "Voici une vue 3D de la salle de bain que nous allons réaliser. Transforme-la en photo réaliste, comme prise par un photographe d'intérieur, avec le même point de vue. Respecte strictement la place de chaque élément : ne déplace rien d'un mur à l'autre.";
-    return [debut, "",
-      `Pièce : ${metres(l)} × ${metres(p)}, hauteur ${metres(h)}.`,
-      `Carrelage mural ${faience} : ${revetement(etat.murs)}.`,
-      etat.accent.actif ? `Mur de la douche : ${revetement(etat.accent)}.` : "",
-      `Sol : ${revetement(etat.sol)}.`,
-      etat.faience !== "plafond" ? `Peinture au-dessus du carrelage : ${(PEINTURES[etat.peinture] || "").toLowerCase()}.` : "",
-      `Robinetterie et poignées : ${(ROBINETTERIE[etat.robinetterie]?.nom || "").toLowerCase()}.`,
-      "", source === "photo" ? "Équipements :" : "Équipements et leur place (mur du fond et mur de gauche visibles sur l'image) :", ...equipements, "",
-      "Lumière naturelle douce, rendu haut de gamme, sans texte, sans logo et sans personne."].filter((x, i, t) => x !== "" || (t[i - 1] !== "" && i > 0)).join("\n");
+    const FORMATS_IMG = { image: "le même cadrage que l'image jointe", vertical: "vertical 9:16 (pour les réseaux sociaux)", paysage: "horizontal 3:2" };
+    const photo = source === "photo";
+    return [
+      photo
+        ? "Rénovation de salle de bain : à partir de la photo jointe (la pièce actuelle de mon client), crée la photo de cette même pièce une fois rénovée."
+        : "Rénovation de salle de bain : crée la vraie photo de cette salle de bain une fois les travaux finis. L'image 3D jointe sert seulement de plan d'aménagement (où va chaque élément, quelles couleurs) : ce n'est pas le rendu attendu.",
+      "",
+      "STYLE PHOTO",
+      "- Photographie d'architecture d'intérieur professionnelle, qualité magazine de décoration.",
+      "- Objectif grand-angle 24 mm, appareil à hauteur d'œil (1,50 m), lignes verticales bien droites, aucune déformation, plafond visible.",
+      "- Lumière naturelle douce et diffuse, ombres légères, miroir lumineux allumé, balance des blancs neutre.",
+      "- Rendu 100 % photoréaliste : vraies matières (céramique, verre, bois, métal), reflets justes, joints de carrelage nets et réguliers, légère profondeur de champ. Aucun aspect 3D, dessin ou image de synthèse.",
+      `- Format : ${FORMATS_IMG[format] || FORMATS_IMG.image}.`,
+      "",
+      "À RESPECTER STRICTEMENT",
+      photo
+        ? "- Même point de vue que la photo : mêmes murs, même fenêtre, même porte, mêmes proportions."
+        : "- Ne reprends pas le point de vue de l'image 3D (maquette vue de haut, en coupe, sans plafond) ni son aspect. Photographie la pièce comme une vraie pièce fermée, avec ses murs et son plafond, depuis l'entrée, debout, face au mur du fond, le mur de gauche visible sur le côté.",
+      photo ? null : "- Chaque élément reste exactement à sa place et sur son mur, comme sur l'image 3D : ne déplace rien, n'ajoute aucun meuble, n'en retire aucun.",
+      `- Pièce de ${metres(l)} × ${metres(p)}, hauteur ${metres(h)}.`,
+      `- Carrelage mural ${faience} : ${revetement(etat.murs)}.`,
+      etat.accent.actif ? `- Mur de la douche : ${revetement(etat.accent)}.` : null,
+      `- Sol : ${revetement(etat.sol)}.`,
+      etat.faience !== "plafond" ? `- Peinture au-dessus du carrelage : ${(PEINTURES[etat.peinture] || "").toLowerCase()}, finition mate.` : null,
+      `- Robinetterie et poignées : ${(ROBINETTERIE[etat.robinetterie]?.nom || "").toLowerCase()}. Les autres éléments gardent leur couleur indiquée ci-dessous.`,
+      "",
+      photo ? "ÉQUIPEMENTS" : "ÉQUIPEMENTS ET LEUR PLACE (le mur du fond et le mur de gauche sont ceux visibles sur l'image)",
+      ...equipements,
+      "",
+      "À ÉVITER",
+      "- Texte, logo, filigrane, personne, animal.",
+      "- Objets en plus (plantes, décoration chargée) : au plus une serviette blanche et un flacon de savon.",
+      "- Tout changement de couleur, de matière ou d'emplacement par rapport à cette description."
+    ].filter(x => x !== null).join("\n");
   }
   document.getElementById("gptSim").onclick = () => {
     const v = document.createElement("div"); v.className = "voile";
-    v.innerHTML = `<div class="fenetre" role="dialog" aria-modal="true"><div class="tete"><h2>Image réaliste avec Gemini</h2><button class="icone" data-fermer aria-label="Fermer">✕</button></div>
-      <p class="gris" style="font-size:14px;margin-bottom:12px">Avec le compte Gemini de l'artisan : copiez le texte, ouvrez Gemini, collez-le et joignez l'image. Le résultat est une image d'illustration : les dimensions et les détails ne sont pas exacts.</p>
-      <div class="champ"><label>À partir de</label><select id="gptSource"><option value="3d">L'image de la simulation 3D</option><option value="photo">La photo de la pièce du client</option></select></div>
+    v.innerHTML = `<div class="fenetre" role="dialog" aria-modal="true"><div class="tete"><h2>Image réaliste</h2><button class="icone" data-fermer aria-label="Fermer">✕</button></div>
+      <p class="gris" style="font-size:14px;margin-bottom:12px">Avec le compte de l'artisan : copiez le texte, ouvrez l'outil, collez-le et joignez l'image. Le résultat est une image d'illustration : les dimensions et les détails ne sont pas exacts.</p>
+      <div class="trois">
+        <div class="champ"><label>Outil</label><select id="gptOutil"><option value="gemini">Gemini</option><option value="chatgpt">ChatGPT</option></select></div>
+        <div class="champ"><label>À partir de</label><select id="gptSource"><option value="3d">L'image 3D</option><option value="photo">La photo du client</option></select></div>
+        <div class="champ"><label>Format</label><select id="gptFormat"><option value="image">Comme l'image</option><option value="vertical">Vertical (réseaux)</option><option value="paysage">Horizontal</option></select></div>
+      </div>
       <textarea id="gptTexte" rows="12" style="font-size:13px;margin:8px 0 12px"></textarea>
       <div class="actions-doc" style="margin:0">
         <button class="btn" id="gptCopier">1. Copier le texte</button>
         <button class="btn clair" id="gptImage">2. Enregistrer l'image 3D</button>
-        <a class="btn clair" href="https://gemini.google.com/" target="_blank" rel="noopener">3. Ouvrir Gemini</a>
+        <a class="btn clair" id="gptOuvrir" href="https://gemini.google.com/" target="_blank" rel="noopener">3. Ouvrir Gemini</a>
       </div></div>`;
     document.body.appendChild(v);
     const texte = v.querySelector("#gptTexte"), source = v.querySelector("#gptSource"), btnImage = v.querySelector("#gptImage");
-    const remplir = () => { texte.value = descriptionIA(source.value); btnImage.hidden = source.value === "photo"; };
-    remplir(); source.onchange = remplir;
+    const outil = v.querySelector("#gptOutil"), format = v.querySelector("#gptFormat"), ouvrir = v.querySelector("#gptOuvrir");
+    const OUTILS = { gemini: ["Gemini", "https://gemini.google.com/"], chatgpt: ["ChatGPT", "https://chatgpt.com/"] };
+    try { const o = localStorage.getItem("ka_outil_ia"); if (OUTILS[o]) outil.value = o; } catch { /* rien */ }
+    const remplir = () => {
+      texte.value = descriptionIA(source.value, format.value); btnImage.hidden = source.value === "photo";
+      const [nom, url] = OUTILS[outil.value]; ouvrir.href = url; ouvrir.textContent = `3. Ouvrir ${nom}`;
+      try { localStorage.setItem("ka_outil_ia", outil.value); } catch { /* rien */ }
+    };
+    remplir(); source.onchange = format.onchange = outil.onchange = remplir;
     v.addEventListener("click", e => { if (e.target === v || e.target.closest("[data-fermer]")) v.remove(); });
     v.querySelector("#gptCopier").onclick = async () => {
       try { await navigator.clipboard.writeText(texte.value); } catch { texte.select(); document.execCommand("copy"); }
-      toast("Texte copié ✓ : collez-le dans Gemini");
+      toast(`Texte copié ✓ : collez-le dans ${OUTILS[outil.value][0]}`);
     };
     btnImage.onclick = async () => {
       const blob = await (await fetch(image(1600))).blob();
