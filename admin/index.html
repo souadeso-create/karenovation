@@ -122,6 +122,11 @@
   .groupe-ajout summary::after { content: "+"; font-size: 20px; font-weight: 400; color: var(--gris); width: 16px; text-align: center; }
   .groupe-ajout[open] summary::after { content: "–"; }
   .groupe-ajout .objets { padding-bottom: 14px; }
+  .deroule-couleur { padding-bottom: 0; }
+  .deroule-couleur[open] { padding-bottom: 14px; }
+  .deroule-couleur summary span { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .deroule-couleur summary b { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px; }
+  .deroule-couleur .mini { width: 20px; height: 20px; border-radius: 50%; flex: none; box-shadow: 0 0 0 1px var(--sable); background-size: cover; }
   .choix { display: flex; justify-content: space-between; gap: 10px; width: 100%; text-align: left; background: #fff; border: 1px solid transparent; border-radius: 12px; padding: 12px 14px; margin-bottom: 6px; cursor: pointer; }
   .choix:hover { border-color: var(--sable); }
 

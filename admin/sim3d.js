@@ -454,19 +454,17 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
           <label>Peinture (au-dessus de la faïence)</label><div class="palette">${Object.entries(PEINTURES).map(([c, n]) => `<button type="button" class="pastille ${c === etat.peinture ? "actif" : ""}" data-peinture="${c}" title="${n}" aria-label="${n}" style="background:${c}"></button>`).join("")}</div>
         </fieldset>
         ${["murs", "accent", "sol"].map(k => `
-        <fieldset><legend>${TITRES[k]}</legend>
+        <details class="groupe-ajout deroule-couleur"><summary>${TITRES[k]}<span><i class="mini" data-mini="${k}" style="background:${MATIERES[etat[k].matiere].couleur}"></i><b data-nommat="${k}">${esc(MATIERES[etat[k].matiere].nom)}</b></span></summary>
           ${k === "accent" ? `<label style="display:flex;gap:8px;align-items:center;text-transform:none;letter-spacing:0;font-weight:500;color:var(--encre)"><input type="checkbox" id="accentActif" ${etat.accent.actif ? "checked" : ""} style="width:auto"> Carrelage différent derrière la douche</label>` : ""}
           <div class="palette" style="margin:6px 0 4px">${pal(MATIERES, etat[k].matiere, "mat-" + k)}</div>
-          <p class="gris" style="font-size:13px;margin-bottom:8px" data-nommat="${k}">${esc(MATIERES[etat[k].matiere].nom)}</p>
           <div class="deux">
             <div class="champ"><label>Format</label><select data-format="${k}">${opts(FORMATS, etat[k].format)}</select></div>
             <div class="champ"><label>Joints</label><select data-joint="${k}">${opts({ blanc: "Blancs", gris: "Gris", noir: "Noirs" }, etat[k].joint)}</select></div>
           </div>
-        </fieldset>`).join("")}
-        <fieldset><legend>Robinetterie et poignées</legend>
+        </details>`).join("")}
+        <details class="groupe-ajout deroule-couleur"><summary>Robinetterie et poignées<span><i class="mini" id="miniRobinet" style="background:${ROBINETTERIE[etat.robinetterie]?.couleur}"></i><b id="nomRobinet">${esc(ROBINETTERIE[etat.robinetterie]?.nom || "")}</b></span></summary>
           <div class="palette">${Object.entries(ROBINETTERIE).map(([k, r]) => `<button type="button" class="pastille ${k === etat.robinetterie ? "actif" : ""}" data-robinet="${k}" title="${r.nom}" aria-label="${r.nom}" style="background:${r.couleur}"></button>`).join("")}</div>
-          <p class="gris" style="font-size:13px;margin-top:6px" id="nomRobinet">${esc(ROBINETTERIE[etat.robinetterie]?.nom || "")}</p>
-        </fieldset>
+        </details>
         <fieldset><legend>Ajouter</legend>
           ${GROUPES.map(gp => { const items = Object.entries(CAT).filter(([, c]) => c.groupe === gp);
             return `<details class="groupe-ajout"><summary>${gp}<span>${items.length}</span></summary><div class="objets">${items.map(([k, c]) => `<button type="button" data-ajout="${k}">${esc(c.nom)}</button>`).join("")}</div></details>`; }).join("")}
@@ -758,11 +756,13 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
       const k = cle.slice(3).toLowerCase(); etat[k].matiere = b.dataset[cle];
       if (k === "sol" && ["bois", "boisClair", "noyer"].includes(b.dataset[cle])) etat.sol.format = "parquet";
       panneau.querySelector(`[data-nommat="${k}"]`).textContent = MATIERES[b.dataset[cle]].nom;
+      panneau.querySelector(`[data-mini="${k}"]`).style.background = MATIERES[b.dataset[cle]].couleur;
     } else if (b.dataset.peinture) etat.peinture = b.dataset.peinture;
     else if (b.dataset.robinet) {
       etat.robinetterie = b.dataset.robinet; appliquerRobinetterie(etat.robinetterie);
       panneau.querySelectorAll("[data-robinet]").forEach(x => x.classList.toggle("actif", x === b));
-      document.getElementById("nomRobinet").textContent = ROBINETTERIE[etat.robinetterie].nom; return;
+      document.getElementById("nomRobinet").textContent = ROBINETTERIE[etat.robinetterie].nom;
+      document.getElementById("miniRobinet").style.background = ROBINETTERIE[etat.robinetterie].couleur; return;
     }
     else if (b.dataset.ajout) {
       const t = b.dataset.ajout; ajouterObjet(t);
