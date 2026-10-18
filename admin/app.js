@@ -287,7 +287,7 @@ async function vueDocument(id, type, params) {
     majTotal();
     lier();
     const cd = document.getElementById("carnetDoc");
-    if (cd) import("./carnet.js").then(m => m.monterCarnet(cd, { db, client: { ...(d.client || {}), id: d.client_id }, toast, esc, erreur })).catch(erreur);
+    if (cd) import("./carnet.js").then(m => m.monterCarnet(cd, { db, client: { ...(d.client || {}), id: d.client_id }, P, toast, esc, erreur })).catch(erreur);
   };
 
   const dessinerLots = () => {
@@ -588,7 +588,7 @@ async function vueClient(id) {
         <div class="liste">${sims.map(s => `<a class="ligne-liste" href="#/3d?sim=${s.id}"><div><b>${esc(s.nom || "Simulation")}</b><small>${dateFr(String(s.created_at).slice(0, 10))}</small></div>${s.image ? `<img src="${s.image}" alt="" style="width:64px;height:48px;object-fit:cover;border-radius:8px">` : ""}</a>`).join("") || '<p class="gris">Aucune simulation.</p>'}</div>` : ""}
       </div>
     </div>`;
-  if (c.id) import("./carnet.js").then(m => m.monterCarnet(document.getElementById("carnet"), { db, client: c, toast, esc, erreur })).catch(erreur);
+  if (c.id) import("./carnet.js").then(m => m.monterCarnet(document.getElementById("carnet"), { db, client: c, P, toast, esc, erreur })).catch(erreur);
   document.getElementById("fc").onsubmit = async e => {
     e.preventDefault();
     const o = lireForm(e.target, { ...c });
@@ -646,16 +646,31 @@ function formulairePrestation(p, cats) {
 }
 
 /* =================== Plus / Réglages =================== */
+// installer l'admin comme une appli : Android propose l'installation, l'iPhone passe par Safari
+let invitationInstall = null;
+window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); invitationInstall = e; });
+const dejaInstallee = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+function installerAppli() {
+  if (invitationInstall) { invitationInstall.prompt(); invitationInstall.userChoice.finally(() => { invitationInstall = null; }); return; }
+  const iphone = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  fenetre("Mettre l'appli sur le téléphone", iphone
+    ? `<ol class="etapes-install"><li>Ouvrez cette page dans <b>Safari</b>.</li><li>Touchez le bouton <b>Partager</b> (le carré avec une flèche vers le haut).</li><li>Choisissez <b>Sur l'écran d'accueil</b>, puis <b>Ajouter</b>.</li></ol><p class="gris" style="font-size:14px">L'icône KA apparaît à côté de vos applis : un toucher, et l'admin s'ouvre en plein écran.</p>`
+    : `<ol class="etapes-install"><li>Ouvrez cette page dans <b>Chrome</b>.</li><li>Touchez les <b>trois points</b> en haut à droite.</li><li>Choisissez <b>Ajouter à l'écran d'accueil</b> (ou <b>Installer l'application</b>), puis <b>Installer</b>.</li></ol><p class="gris" style="font-size:14px">L'icône KA apparaît à côté de vos applis : un toucher, et l'admin s'ouvre en plein écran.</p>`);
+}
+
 function vuePlus() {
   vue.innerHTML = `
     <div class="entete"><h1>Plus</h1></div>
     <div class="liste">
+      ${dejaInstallee() ? "" : `<button class="ligne-liste" id="installer" style="border:0;text-align:left;width:100%;cursor:pointer"><div><b>Mettre l'appli sur le téléphone</b><small>Une icône KA sur l'écran d'accueil, pour ouvrir l'admin en un toucher</small></div><span class="gris">›</span></button>`}
       <a class="ligne-liste" href="#/3d"><div><b>Simulation 3D</b><small>Montrer au client sa future salle de bain</small></div><span class="gris">›</span></a>
       <a class="ligne-liste" href="#/reglages"><div><b>Réglages</b><small>Entreprise, IBAN, numérotation, conditions</small></div><span class="gris">›</span></a>
       <button class="ligne-liste" id="sauve" style="border:0;text-align:left;width:100%;cursor:pointer"><div><b>Sauvegarde</b><small>Télécharger toutes les données (fichier)</small></div><span class="gris">›</span></button>
       <a class="ligne-liste" href="../" target="_blank"><div><b>Voir le site</b><small>karenovation.fr</small></div><span class="gris">›</span></a>
       ${db.MODE_ESSAI ? "" : `<button class="ligne-liste" id="deco" style="border:0;text-align:left;width:100%;cursor:pointer"><div><b>Se déconnecter</b></div><span class="gris">›</span></button>`}
     </div>`;
+  const ins = document.getElementById("installer");
+  if (ins) ins.onclick = installerAppli;
   document.getElementById("sauve").onclick = async () => {
     const data = await db.exporterTout();
     const a = document.createElement("a");
@@ -670,7 +685,8 @@ const CHAMPS_P = [
   ["Entreprise", [["entreprise", "Nom"], ["forme", "Forme juridique"], ["adresse", "Adresse"], ["cp", "Code postal"], ["ville", "Ville"], ["tel", "Téléphone"], ["email", "E-mail"], ["site", "Site"]]],
   ["Mentions légales", [["siret", "SIRET"], ["ape", "Code APE"], ["tva_intra", "N° TVA"], ["mention_tva", "Mention TVA"]]],
   ["Paiement", [["iban", "IBAN"], ["bic", "BIC"], ["titulaire", "Titulaire du compte"], ["moyen_paiement", "Moyen de paiement"], ["acompte_pct", "Acompte par défaut (%)", "number"], ["validite_jours", "Validité des devis (jours)", "number"], ["echeance_jours", "Échéance (jours)", "number"]]],
-  ["Numérotation", [["prochain_devis", "Prochain n° de devis", "number"], ["prochain_facture", "Prochain n° de facture", "number"]]]
+  ["Numérotation", [["prochain_devis", "Prochain n° de devis", "number"], ["prochain_facture", "Prochain n° de facture", "number"]]],
+  ["Chantiers", [["taux_horaire", "Coût d'une heure de travail (€)", "number"], ["lien_avis", "Lien pour laisser un avis Google"]]]
 ];
 function vueReglages() {
   vue.innerHTML = `
@@ -686,7 +702,7 @@ function vueReglages() {
   document.getElementById("fr").onsubmit = async e => {
     e.preventDefault();
     const o = lireForm(e.target, { ...P });
-    ["acompte_pct", "validite_jours", "echeance_jours", "prochain_devis", "prochain_facture"].forEach(k => { o[k] = Number(o[k]) || 0; });
+    ["acompte_pct", "validite_jours", "echeance_jours", "prochain_devis", "prochain_facture", "taux_horaire"].forEach(k => { o[k] = Number(o[k]) || 0; });
     try { await db.enregistrerParametres(o); P = o; toast("Réglages enregistrés ✓"); } catch (er) { erreur(er); }
   };
 }
@@ -767,7 +783,7 @@ async function routeur() {
     else if (r === "plus") vuePlus();
     else if (r === "reglages") vueReglages();
     else if (r === "3d") await vue3D(params);
-    else if (r === "reception") { const { vueReception } = await import("./reception.js"); await vueReception(vue, { db, docId: a, P, toast, esc, erreur }); }
+    else if (r === "reception") { const { vueReception } = await import("./reception.js"); await vueReception(vue, { db, docId: a, P, toast, esc, erreur, envoyerMessage }); }
     else await vueAccueil();
   } catch (e) { erreur(e); }
 }

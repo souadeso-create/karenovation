@@ -15,7 +15,7 @@ async function reduire(fichier) {
   return c.toDataURL("image/jpeg", .75);
 }
 
-export async function vueReception(vue, { db, docId, P, toast, esc, erreur }) {
+export async function vueReception(vue, { db, docId, P, toast, esc, erreur, envoyerMessage }) {
   const doc = await db.lire("documents", docId);
   if (!doc) { vue.innerHTML = '<p class="vide">Document introuvable.</p>'; return; }
   let ligne = await db.chercher("receptions", "document_id", docId);
@@ -75,6 +75,7 @@ export async function vueReception(vue, { db, docId, P, toast, esc, erreur }) {
           <div class="actions-doc">
             ${signe
               ? `<button class="btn" id="pdfR">PDF du PV</button><button class="btn clair" id="partageR">Envoyer au client</button>
+                 <button class="btn clair" id="avisR">Demander un avis Google</button>
                  <button class="btn discret" id="annulerSig">Annuler la signature</button>`
               : `<button class="btn" id="signerR">Faire signer et enregistrer</button><button class="btn discret" id="enregR">Enregistrer sans signature</button>`}
           </div>
@@ -127,6 +128,18 @@ export async function vueReception(vue, { db, docId, P, toast, esc, erreur }) {
       r.signature = champ("pad").toDataURL("image/png"); r.signature_ent = traces.padEnt ? champ("padEnt").toDataURL("image/png") : null;
       r.signe_le = new Date().toISOString();
       try { await enregistrer(); toast("PV signé ✓"); dessiner(); } catch (e) { r.signe_le = null; erreur(e); }
+    };
+    const av = champ("avisR");
+    if (av) av.onclick = async () => {
+      if (!P.lien_avis) return toast("Ajoutez d'abord le lien de votre fiche Google dans Réglages > Chantiers.");
+      const nom = [c.civilite, c.nom].filter(Boolean).join(" ");
+      await envoyerMessage(doc, `Bonjour ${nom},
+
+Merci pour votre confiance ! Si vous êtes content(e) de votre nouvelle salle de bain, un petit avis nous aiderait beaucoup :
+${P.lien_avis}
+
+Bonne journée,
+KA Rénovation`);
     };
     const an = champ("annulerSig");
     if (an) an.onclick = async () => { r.signe_le = null; r.signature = null; r.signature_ent = null; try { await enregistrer(); toast("Signature retirée"); dessiner(); } catch (e) { erreur(e); } };
