@@ -9,7 +9,8 @@ const TYPES = {
   depense: { nom: "Dépense", bouton: "+ Dépense", aide: "Colle et joints chez le fournisseur" }
 };
 export const CATEGORIES = { fournitures: "Fournitures et consommables", carburant: "Carburant", peage: "Péage et parking", location: "Location de matériel",
-  decharge: "Déchetterie", outillage: "Outillage", soustraitance: "Sous-traitance", repas: "Repas", autre: "Autre" };
+  decharge: "Déchetterie", outillage: "Outillage", vehicule: "Véhicule (entretien)", assurance: "Assurances", telephone: "Téléphone et internet",
+  soustraitance: "Sous-traitance", repas: "Repas", autre: "Autre" };
 const eur = n => (Number(n) || 0).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const estPhoto = l => (l.chemin || l.image) && l.type !== "depense";
 

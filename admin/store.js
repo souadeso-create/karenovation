@@ -71,7 +71,7 @@ export async function enregistrer(table, obj) {
   if (table === "documents") ligne.updated_at = new Date().toISOString();
   if (MODE_ESSAI) {
     const l = lireLocal(table);
-    if (!ligne.id) { ligne.id = uuid(); ligne.created_at = new Date().toISOString(); l.push(ligne); }
+    if (!ligne.id) { ligne.id = uuid(); ligne.created_at = ligne.created_at || new Date().toISOString(); l.push(ligne); }
     else { const i = l.findIndex(x => x.id === ligne.id); if (i >= 0) l[i] = { ...l[i], ...ligne }; else l.push(ligne); }
     ecrireLocal(table, l);
     return ligne;
@@ -115,7 +115,7 @@ export async function ajouterCarnet(entree, photo) {
     return enregistrer("carnet", ligne);
   }
   if (photo) {
-    const chemin = `${entree.client_id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
+    const chemin = `${entree.client_id || "hors-chantier"}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
     const { error } = await sb.storage.from("chantiers").upload(chemin, photo, { contentType: "image/jpeg" });
     if (error) throw error;
     ligne.chemin = chemin;

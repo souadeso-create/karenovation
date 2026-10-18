@@ -120,30 +120,71 @@ async function vueAccueil() {
   };
 }
 
-// Dépenses notées dans les carnets de chantier, pour le mois choisi : par catégorie et par chantier
+// Dépenses du mois : celles des carnets de chantier et celles hors chantier, par catégorie et par chantier
 function blocDepenses(depenses, clients, moisChoisi) {
-  if (!depenses.length) return "";
   const moisDispo = [...new Set([moisChoisi, ...depenses.map(x => String(x.created_at).slice(0, 7))])].sort().reverse();
   const nomMois = m => new Date(m + "-15").toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
   const dessiner = m => {
     const l = depenses.filter(x => String(x.created_at).slice(0, 7) === m), total = l.reduce((a, x) => a + (Number(x.montant) || 0), 0);
-    const grouper = cle => { const g = {}; l.forEach(x => { const k = cle(x); g[k] = (g[k] || 0) + (Number(x.montant) || 0); }); return Object.entries(g).sort((a, b) => b[1] - a[1]); };
-    const parCat = grouper(x => x.categorie || "autre"), parChantier = grouper(x => x.client_id);
-    const barre = (nom, v, lien) => `<div class="ligne-bilan"><span>${lien ? `<a href="${lien}">${esc(nom)}</a>` : esc(nom)}<i class="barre-dep" style="width:${total ? Math.max(4, v / total * 100) : 0}%"></i></span><span>${eur(v)} €</span></div>`;
-    return `<div class="ligne-bilan total" style="border-top:0"><span>Total du mois</span><span>${eur(total)} €</span></div>
-      ${l.length ? `<div class="petit" style="margin:14px 0 4px">Par catégorie</div>${parCat.map(([k, v]) => barre(CATEGORIES[k] || "Autre", v)).join("")}
-      <div class="petit" style="margin:14px 0 4px">Par chantier</div>${parChantier.map(([id, v]) => { const c = clients.find(x => x.id === id); return barre(c ? nomClient(c) : "Client archivé", v, c ? `#/client/${id}` : ""); }).join("")}`
-      : '<p class="gris" style="font-size:14px">Aucune dépense ce mois-ci.</p>'}`;
+    const grouper = cle => { const g = {}; l.forEach(x => { const k = cle(x); g[k] = g[k] || { v: 0, n: 0 }; g[k].v += Number(x.montant) || 0; g[k].n++; }); return Object.entries(g).sort((a, b) => b[1].v - a[1].v); };
+    const parCat = grouper(x => x.categorie || "autre"), parChantier = grouper(x => x.client_id || "");
+    const barre = (nom, { v, n }, lien) => `<div class="ligne-bilan"><span>${lien ? `<a href="${lien}">${esc(nom)}</a>` : esc(nom)} <small class="gris">· ${n} dépense${n > 1 ? "s" : ""}</small><i class="barre-dep" style="width:${total ? Math.max(4, v / total * 100) : 0}%"></i></span><span>${eur(v)} €</span></div>`;
+    const hors = l.filter(x => !x.client_id).sort((a, b) => a.created_at < b.created_at ? 1 : -1);
+    return l.length ? `<div class="petit" style="margin:10px 0 4px">Par catégorie</div>${parCat.map(([k, g]) => barre(CATEGORIES[k] || "Autre", g)).join("")}
+      <div class="ligne-bilan total"><span>Total du mois</span><span>${eur(total)} €</span></div>
+      <div class="petit" style="margin:16px 0 4px">Par chantier</div>${parChantier.map(([id, g]) => { const c = clients.find(x => x.id === id); return barre(id ? (c ? nomClient(c) : "Client archivé") : "Hors chantier", g, c ? `#/client/${id}` : ""); }).join("")}
+      ${hors.length ? `<div class="petit" style="margin:16px 0 4px">Détail hors chantier</div>${hors.map(x => `<div class="ligne-bilan"><span>${new Date(x.created_at).toLocaleDateString("fr-FR")} · ${esc(CATEGORIES[x.categorie] || "Autre")}${x.texte ? " · " + esc(x.texte) : ""}</span><span>${eur(x.montant)} € <button type="button" class="icone" data-retirer-dep="${x.id}" aria-label="Retirer" style="width:28px;height:28px">✕</button></span></div>`).join("")}` : ""}`
+      : '<p class="gris" style="font-size:14px;margin-top:8px">Aucune dépense ce mois-ci.</p>';
   };
   setTimeout(() => {
-    const s = document.getElementById("moisDep"), z = document.getElementById("zoneDep");
-    if (s) s.onchange = () => { z.innerHTML = dessiner(s.value); };
+    const s = document.getElementById("moisDep"), z = document.getElementById("zoneDep"); if (!s) return;
+    s.onchange = () => { z.innerHTML = dessiner(s.value); };
+    document.getElementById("depHors").onclick = () => ajouterDepenseHors();
+    z.onclick = e => {
+      const b = e.target.closest("[data-retirer-dep]"); if (!b) return;
+      const x = depenses.find(d => d.id === b.dataset.retirerDep); if (!x) return;
+      const i = depenses.indexOf(x); depenses.splice(i, 1); z.innerHTML = dessiner(s.value);
+      const t = document.createElement("div"); t.className = "toast";
+      t.innerHTML = 'Dépense retirée <button type="button" style="margin-left:10px;background:none;border:0;color:#fff;text-decoration:underline;font:inherit;cursor:pointer">Annuler</button>';
+      document.body.appendChild(t);
+      const minuteur = setTimeout(async () => { t.remove(); try { await db.supprimerCarnet(x); } catch (er) { depenses.splice(i, 0, x); erreur(er); } }, 8000);
+      t.querySelector("button").onclick = () => { clearTimeout(minuteur); t.remove(); depenses.splice(i, 0, x); z.innerHTML = dessiner(s.value); };
+    };
   });
   return `<div class="carte" style="margin-bottom:22px">
-    <div class="entete" style="margin-bottom:6px"><h2>Dépenses des chantiers</h2>
+    <div class="entete" style="margin-bottom:6px"><h2>Dépenses</h2>
       <select id="moisDep" style="width:auto">${moisDispo.map(m => `<option value="${m}">${nomMois(m)}</option>`).join("")}</select></div>
+    <button type="button" class="btn clair petit-btn" id="depHors">+ Dépense hors chantier</button>
     <div id="zoneDep">${dessiner(moisChoisi)}</div>
-    <p class="gris" style="font-size:12px;margin-top:8px">Notées dans le carnet de chantier de chaque client (+ Dépense).</p></div>`;
+    <p class="gris" style="font-size:12px;margin-top:8px">Les dépenses d'un chantier se notent dans le carnet du client (+ Dépense).</p></div>`;
+}
+
+// essence de la semaine, assurance, outillage… : une dépense sans client
+function ajouterDepenseHors() {
+  const f = fenetre("Dépense hors chantier", `
+    <div class="champ"><label for="hCat">Catégorie</label><select id="hCat">${Object.entries(CATEGORIES).map(([k, n]) => `<option value="${k}" ${k === "carburant" ? "selected" : ""}>${n}</option>`).join("")}</select></div>
+    <div class="deux"><div class="champ"><label for="hMontant">Montant €</label><input type="number" id="hMontant" step="0.01" min="0" inputmode="decimal"></div>
+      <div class="champ"><label for="hDate">Date</label><input type="date" id="hDate" value="${aujourdhui()}"></div></div>
+    <div class="champ"><label for="hTexte">Détail (facultatif)</label><input type="text" id="hTexte" placeholder="Plein du camion, assurance du mois…" maxlength="200"></div>
+    <label class="btn discret petit-btn" style="display:inline-flex">Photo du ticket (facultatif)<input type="file" id="hTicket" accept="image/*" hidden></label>
+    <div class="actions-doc"><button class="btn" id="hOk">Ajouter</button><button class="btn discret" data-fermer>Annuler</button></div>`);
+  let ticket = null;
+  f.el.querySelector("#hTicket").onchange = async e => {
+    const fi = e.target.files[0]; if (!fi) return;
+    const img = await createImageBitmap(fi, { imageOrientation: "from-image" }), k = Math.min(1, 1600 / Math.max(img.width, img.height));
+    const c = document.createElement("canvas"); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k); c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+    ticket = await new Promise(ok => c.toBlob(ok, "image/jpeg", .8)); toast("Ticket prêt ✓");
+  };
+  f.el.querySelector("#hOk").onclick = async () => {
+    const montant = Number(f.el.querySelector("#hMontant").value || 0); if (!montant) return toast("Indiquez le montant.");
+    const date = f.el.querySelector("#hDate").value || aujourdhui();
+    const quand = date === aujourdhui() ? new Date().toISOString() : new Date(date + "T12:00:00").toISOString();
+    try {
+      await db.ajouterCarnet({ client_id: null, type: "depense", etape: "pendant", montant, created_at: quand,
+        categorie: f.el.querySelector("#hCat").value, texte: f.el.querySelector("#hTexte").value.trim() || null }, ticket);
+      f.fermer(); toast("Dépense ajoutée ✓"); vueAccueil();
+    } catch (e) { erreur(e); }
+  };
 }
 
 function ligneDoc(d) {
