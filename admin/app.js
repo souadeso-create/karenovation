@@ -580,6 +580,8 @@ async function vueClient(id) {
           <a class="btn clair" href="#/3d?client=${c.id}">${ICO.cube}Simulation 3D</a>
           ${c.tel ? `<a class="btn discret" href="tel:${esc(c.tel.replace(/\s/g, ""))}">Appeler</a>` : ""}
         </div>
+        ${docs.some(d => d.type === "devis" && d.statut === "signe") ? `<h2 style="margin:8px 0 10px">PV de fin de chantier</h2>
+        <div class="liste" id="listePV" style="margin-bottom:22px">${docs.filter(d => d.type === "devis" && d.statut === "signe").map(d => `<a class="ligne-liste" href="#/reception/${d.id}"><div><b>PV · devis ${esc(d.numero)}</b><small data-pv="${d.id}">${esc(d.objet || "")}</small></div><span class="gris">›</span></a>`).join("")}</div>` : ""}
         <h2 style="margin:8px 0 10px">Carnet de chantier</h2>
         <div id="carnet"><p class="gris">Chargement du carnet…</p></div>
         <h2 style="margin:22px 0 10px">Documents</h2>
@@ -588,6 +590,13 @@ async function vueClient(id) {
         <div class="liste">${sims.map(s => `<a class="ligne-liste" href="#/3d?sim=${s.id}"><div><b>${esc(s.nom || "Simulation")}</b><small>${dateFr(String(s.created_at).slice(0, 10))}</small></div>${s.image ? `<img src="${s.image}" alt="" style="width:64px;height:48px;object-fit:cover;border-radius:8px">` : ""}</a>`).join("") || '<p class="gris">Aucune simulation.</p>'}</div>` : ""}
       </div>
     </div>`;
+  // état de chaque PV : à faire, enregistré, ou signé
+  document.querySelectorAll("[data-pv]").forEach(async el => {
+    try {
+      const r = await db.chercher("receptions", "document_id", el.dataset.pv);
+      el.textContent = r?.data?.signe_le ? `✓ Signé le ${new Date(r.data.signe_le).toLocaleDateString("fr-FR")}` : r ? "Commencé, pas encore signé" : "À faire en fin de chantier";
+    } catch { /* l'objet du devis reste affiché */ }
+  });
   if (c.id) import("./carnet.js").then(m => m.monterCarnet(document.getElementById("carnet"), { db, client: c, P, toast, esc, erreur })).catch(erreur);
   document.getElementById("fc").onsubmit = async e => {
     e.preventDefault();
