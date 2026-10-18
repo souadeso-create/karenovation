@@ -97,6 +97,7 @@ async function vueAccueil() {
       <div class="stat"><span class="petit">Encaissé ce mois</span><b>${eur(somme(encaisse))} €</b></div>
       <div class="stat"><span class="petit">Clients</span><b>${clients.length}</b></div>
     </div>
+    ${blocChantiers(docs, clients, depenses)}
     ${blocDepenses(depenses, clients, mois)}
     ${nouvelles.length ? `<a class="alerte" href="#/demandes">${ICO.boite}<span><b>${nouvelles.length} nouvelle${nouvelles.length > 1 ? "s" : ""} demande${nouvelles.length > 1 ? "s" : ""} de devis</b><small>${esc(nouvelles.slice(0, 3).map(x => x.nom).join(", "))}</small></span><span>›</span></a>` : ""}
     ${relances.length ? `<h2 style="margin-bottom:12px">À relancer</h2>
@@ -118,6 +119,35 @@ async function vueAccueil() {
     try { await db.enregistrer("documents", { ...d }); } catch (er) { erreur(er); } // repart pour 7 jours
     b.closest(".ligne-liste").remove(); toast("Relance envoyée ✓");
   };
+}
+
+// Chantiers en cours : un devis signé dont le PV n'est pas encore signé ; un toucher ouvre la fiche du client (carnet)
+function blocChantiers(docs, clients, depenses) {
+  const signes = docs.filter(d => d.type === "devis" && d.statut === "signe" && d.client_id);
+  if (!signes.length) return "";
+  const parClient = {};
+  signes.forEach(d => { (parClient[d.client_id] = parClient[d.client_id] || []).push(d); });
+  setTimeout(() => {
+    signes.forEach(async d => {
+      try {
+        const r = await db.chercher("receptions", "document_id", d.id);
+        if (r?.data?.signe_le) document.querySelector(`[data-pv-fini="${d.id}"]`)?.setAttribute("data-fini", "1");
+      } catch { /* on garde le chantier affiché */ }
+      const z = document.getElementById("chantiers"); if (!z) return;
+      z.querySelectorAll(".ligne-chantier").forEach(l => { l.hidden = [...l.querySelectorAll("[data-pv-fini]")].every(x => x.dataset.fini === "1"); });
+      const vide = document.getElementById("chantiersVide"); if (vide) vide.hidden = [...z.querySelectorAll(".ligne-chantier")].some(l => !l.hidden);
+    });
+  });
+  return `<div class="carte" style="margin-bottom:22px"><h2 style="margin-bottom:6px">Chantiers en cours</h2>
+    <div id="chantiers">${Object.entries(parClient).map(([id, ds]) => {
+      const c = clients.find(x => x.id === id), total = ds.reduce((a, d) => a + totaux(d).ht, 0);
+      const dep = depenses.filter(x => x.client_id === id).reduce((a, x) => a + (Number(x.montant) || 0), 0);
+      return `<a class="ligne-chantier" href="#/client/${id}?carnet=1">${ds.map(d => `<i data-pv-fini="${d.id}"></i>`).join("")}
+        <span><b>${esc(c ? nomClient(c) : nomClient(ds[0].client))}</b><small>Devis ${eur(total)} € · dépenses ${eur(dep)} €</small></span>
+        <span class="reste"><small>Reste</small>${eur(total - dep)} €</span></a>`;
+    }).join("")}</div>
+    <p class="gris" id="chantiersVide" hidden style="font-size:14px">Tous les chantiers signés ont leur PV : rien en cours.</p>
+    <p class="gris" style="font-size:12px;margin-top:8px">Reste = devis signés moins les dépenses notées dans le carnet. Un toucher ouvre le chantier.</p></div>`;
 }
 
 // Dépenses du mois : celles des carnets de chantier et celles hors chantier, par catégorie et par chantier
@@ -560,7 +590,7 @@ function formulaireClient(c, rappel) {
   };
 }
 
-async function vueClient(id) {
+async function vueClient(id, params) {
   const c = id === "nouveau" ? {} : await db.lire("clients", id);
   if (!c) { vue.innerHTML = '<p class="vide">Client introuvable.</p>'; return; }
   const docs = c.id ? (await db.lister("documents")).filter(d => d.client_id === c.id) : [];
@@ -597,7 +627,10 @@ async function vueClient(id) {
       el.textContent = r?.data?.signe_le ? `✓ Signé le ${new Date(r.data.signe_le).toLocaleDateString("fr-FR")}` : r ? "Commencé, pas encore signé" : "À faire en fin de chantier";
     } catch { /* l'objet du devis reste affiché */ }
   });
-  if (c.id) import("./carnet.js").then(m => m.monterCarnet(document.getElementById("carnet"), { db, client: c, P, toast, esc, erreur })).catch(erreur);
+  if (c.id) import("./carnet.js").then(async m => {
+    await m.monterCarnet(document.getElementById("carnet"), { db, client: c, P, toast, esc, erreur });
+    if (params?.get("carnet")) document.getElementById("carnet").previousElementSibling?.scrollIntoView({ block: "start" });
+  }).catch(erreur);
   document.getElementById("fc").onsubmit = async e => {
     e.preventDefault();
     const o = lireForm(e.target, { ...c });
@@ -787,7 +820,7 @@ async function routeur() {
     else if (r === "clients") await vueClients();
     else if (r === "demandes") await vueDemandes();
     else if (r === "demande") await vueDemande(a);
-    else if (r === "client") await vueClient(a);
+    else if (r === "client") await vueClient(a, params);
     else if (r === "prestations") await vuePrestations();
     else if (r === "plus") vuePlus();
     else if (r === "reglages") vueReglages();
