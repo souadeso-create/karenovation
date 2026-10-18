@@ -22,6 +22,7 @@ export const PARAMETRES_DEFAUT = {
   echeance_jours: 30,
   prochain_devis: 29,
   prochain_facture: 16,
+  lien_avis: "https://share.google/FgNpJ7iHjoGko4ro1",
   conditions:
     "Prestations incluses : main-d'œuvre, installation et finition des éléments listés dans le devis, consommables (colles, joints, vis, protections), matériaux pour plomberie, électricité et plâtrerie (plaques de plâtre BA13 hydro), évacuation des déchets générés par nos travaux.\n" +
     "Prestations non incluses / fournies par le client : carrelages, faïences, sanitaires, meubles et éléments de décoration. Travaux supplémentaires non prévus ou modifications après signature.\n" +
