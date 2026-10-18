@@ -217,6 +217,7 @@ async function vueDocument(id, type, params) {
         ${s.lignes.map((l, j) => `
           <div class="ligne-doc">
             <textarea rows="2" data-l="${i}.${j}" data-k="designation" placeholder="Désignation">${esc(l.designation)}</textarea>
+            ${l.description ? `<textarea rows="2" class="detail-ligne" data-l="${i}.${j}" data-k="description" placeholder="Détail">${esc(l.description)}</textarea>` : ""}
             <div class="chiffres">
               <div><label>Qté</label><input type="number" step="0.01" inputmode="decimal" value="${esc(l.qte)}" data-l="${i}.${j}" data-k="qte"></div>
               <div><label>Unité</label><select data-l="${i}.${j}" data-k="unite">${UNITES.map(u => `<option ${u === l.unite ? "selected" : ""}>${u}</option>`).join("")}</select></div>

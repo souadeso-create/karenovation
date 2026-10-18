@@ -1375,10 +1375,10 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
       const ps = (await db.lister("prestations", { ordre: "created_at", desc: false })).filter(p => !p.archive);
       const cherche = mot => ps.find(p => p.designation.toLowerCase().includes(mot.toLowerCase()));
       const sections = [], lot = titre => { let s = sections.find(x => x.titre === titre); if (!s) { s = { titre, lignes: [] }; sections.push(s); } return s; };
-      const ajoute = (mot, cat, qte, unite) => {
+      const ajoute = (mot, cat, qte, unite, description = "") => {
         const p = cherche(mot);
-        lot(p?.categorie || cat).lignes.push(p ? { designation: p.designation, description: "", qte, unite: p.unite, pu: Number(p.prix_ht) }
-          : { designation: mot, description: "", qte, unite: unite || "presta", pu: 0 });
+        lot(p?.categorie || cat).lignes.push(p ? { designation: p.designation, description, qte, unite: p.unite, pu: Number(p.prix_ht) }
+          : { designation: mot, description, qte, unite: unite || "presta", pu: 0 });
       };
       const m = metre(), arr = n => Math.round(n * 10) / 10;
       if (etat.depose) ajoute("Dépose complète salle de bain", "Dépose & évacuation", 1);
@@ -1392,6 +1392,9 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
       }
       if (comptes.douche) ajoute("SPEC étanchéité", "Placo / Étanchéité / Sol", 1);
       ajoute("Ragréage", "Placo / Étanchéité / Sol", arr(m.sol), "m2");
+      const cof = coffrages().filter(c => c.creer), dev = cof.reduce((a, c) => a + c.visible, 0);
+      if (dev > .05 || etat.fauxPlafond) ajoute("Placo BA13 hydro", "Placo / Étanchéité / Sol", 1, "presta",
+        [dev > .05 ? `Création de coffrage : ${arr(dev).toLocaleString("fr-FR")} m développés, du sol au plafond` : "", etat.fauxPlafond ? `Faux plafond : ${arr(m.plafond).toLocaleString("fr-FR")} m²` : ""].filter(Boolean).join(" ; "));
       const f = etat.sol.format;
       if (f === "parquet") ajoute("Pose de parquet", "Sols", arr(m.sol), "m2");
       else if (f !== "uni") ajoute(["120x120", "60x120", "80x80"].includes(f) ? "Pose sol grand format" : "Pose carrelage au sol", "Pose carrelage", arr(m.sol), "m2");
@@ -1399,6 +1402,14 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
       if (m.peinture > .5) ajoute("Peinture murs", "Peinture / Finitions", arr(m.peinture), "m2");
       ajoute("Peinture plafond", "Finitions", arr(m.plafond), "m2");
       ajoute("Nettoyage fin de chantier", "Finitions", 1);
+      // fournitures : le carrelage au m² (chutes comprises), puis les fournitures de pose et de placo, détaillées
+      carrelageACommander().forEach(c => ajoute(`Fourniture carrelage ${c.titre.toLowerCase()}`, "Fournitures", Math.ceil(c.total * 10) / 10, "m2",
+        `${c.matiere}, ${c.format}, ${Math.round(c.chute * 100)} % de chutes compris`));
+      const PLACO = /Rails|Montants|Cornières|Laine|Fourrures|Suspentes|Plaques|Vis TTPC|Bande à joint|Enduit/;
+      const fo = fournitures(), pose = fo.filter(x => !PLACO.test(x.nom)), placo = fo.filter(x => PLACO.test(x.nom));
+      const detail = l => l.map(x => `${x.nom} : ${x.qte}`).join(" ; ");
+      if (pose.length) ajoute("Fournitures de pose", "Fournitures", 1, "forfait", detail(pose));
+      if (placo.length) ajoute("Fournitures placo et ossature", "Fournitures", 1, "forfait", detail(placo));
       ajoute("Frais de déplacement", "Déplacement", 1, "forfait");
       await enregistrer();
       await creerDevis(sections, client, etat.nom);
