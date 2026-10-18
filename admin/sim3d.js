@@ -731,14 +731,15 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
   }
   function majMetre() {
     const m = metre(), f = n => n.toLocaleString("fr-FR", { maximumFractionDigits: 1 });
+    const ouvert = document.querySelector("#metre .deroule-carrelage")?.open, cmd = carrelageACommander();
     const bloc = (v, t) => `<div><b style="font-family:var(--serif);font-size:20px;font-weight:400">${f(v)} m²</b><br><span class="gris" style="font-size:13px">${t}</span></div>`;
     document.getElementById("metre").innerHTML = `<div class="petit" style="margin-bottom:8px">Métré</div>
       <div class="deux" style="gap:12px">${bloc(m.sol, `sol · ${FORMATS[etat.sol.format].nom}`)}${bloc(m.murs, "faïence murale")}${bloc(m.peinture, "peinture murs")}${bloc(m.plafond, "plafond")}</div>
-      <div class="petit" style="margin:18px 0 8px">Carrelage à commander</div>
-      ${carrelageACommander().map(c => `<div style="display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--sable)">
+      <details class="groupe-ajout deroule-carrelage" style="margin-top:10px;border-bottom:0;border-top:1px solid var(--sable)" ${ouvert ? "open" : ""}><summary>Carrelage à commander<span>${f(cmd.reduce((a, c) => a + Math.ceil(c.total * 10) / 10, 0))} m² en tout</span></summary>
+      ${cmd.map(c => `<div style="display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--sable)">
         <div><b style="font-weight:600">${c.titre}</b><br><span class="gris" style="font-size:13px">${esc(c.matiere)} · ${esc(c.format)}<br>${f(c.surf)} m² posés + ${Math.round(c.chute * 100)} % de chutes</span></div>
         <div style="text-align:right;white-space:nowrap"><b style="font-family:var(--serif);font-size:20px;font-weight:400">${f(Math.ceil(c.total * 10) / 10)} m²</b>${c.n ? `<br><span class="gris" style="font-size:13px">≈ ${c.n.toLocaleString("fr-FR")} ${c.unite}</span>` : ""}</div></div>`).join("")}
-      <p class="gris" style="font-size:12px;margin-top:6px">Arrondissez au nombre de boîtes du fournisseur.</p>`;
+      <p class="gris" style="font-size:12px;margin-top:6px">Arrondissez au nombre de boîtes du fournisseur.</p></details>`;
   }
 
   /* --- Sélection, déplacement au doigt --- */
