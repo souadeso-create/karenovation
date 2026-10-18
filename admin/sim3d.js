@@ -384,7 +384,7 @@ const POUR_DEVIS = {
 export async function monterSimulateur(vue, { db, params, toast, esc, choisirClient, nomClient, creerDevis }) {
   const defaut = () => ({
     nom: "Salle de bain", dims: { l: 2.6, p: 2.0, h: 2.5 },
-    murs: { matiere: "blanc", format: "60x120", joint: "gris" }, accent: { matiere: "bleu", format: "7.5x15", joint: "blanc", actif: true },
+    murs: { matiere: "blanc", format: "60x120", joint: "gris" }, accent: { matiere: "bleu", format: "7.5x15", joint: "blanc", actif: false },
     sol: { matiere: "beton", format: "60x60", joint: "gris" }, faience: "plafond", peinture: "#f3f1ec", depose: true,
     objets: [
       { type: "douche", x: .7, z: -.55, rot: 0 }, { type: "double", x: -.55, z: -.8, rot: 0 }, { type: "miroir", x: -.55, z: -.98, rot: 0 },
@@ -433,7 +433,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
           <button class="btn clair" id="plan2d">Plan 2D</button>
           <button class="btn discret" id="vueDessus">Vue de dessus</button>
           <button class="btn discret" id="modeChantier">Mode chantier</button>
-          <button class="btn discret" id="aZero">Recommencer à zéro</button>
+          <button class="btn discret" id="aZero">Vider la salle de bain</button>
         </div>
         <div class="carte" id="metre"></div>
       </div>
@@ -846,13 +846,13 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     const b = e.target;
     if (avantZero) { // annuler : on remet la pièce comme avant
       etat.objets = JSON.parse(avantZero); avantZero = null; clearTimeout(minuteurZero);
-      b.textContent = "Recommencer à zéro"; reconstruire(); toast("Pièce remise comme avant ✓"); return;
+      b.textContent = "Vider la salle de bain"; reconstruire(); toast("Pièce remise comme avant ✓"); return;
     }
     avantZero = JSON.stringify(etat.objets);
     etat.objets = []; selection = null; reconstruire();
     b.textContent = "Annuler (remettre comme avant)";
-    toast("Pièce vide : ajoutez vos éléments");
-    minuteurZero = setTimeout(() => { avantZero = null; b.textContent = "Recommencer à zéro"; }, 15000);
+    toast("Salle de bain vidée : ajoutez vos éléments");
+    minuteurZero = setTimeout(() => { avantZero = null; b.textContent = "Vider la salle de bain"; }, 15000);
   };
   document.getElementById("modeChantier").onclick = e => { chantier = !chantier; e.target.textContent = chantier ? "Vue finie" : "Mode chantier"; construirePiece(); };
   const image = (largeur = 1400) => {
