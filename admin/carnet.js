@@ -117,6 +117,9 @@ export async function monterCarnet(el, { db, client, P = {}, toast, esc, erreur 
         <button type="button" data-filtre="heures"><b>${duree(heures)}</b>de travail</button>
         <button type="button" data-filtre="depense"><b>${eur(depenses)} €</b>dépenses</button>
       </div>
+      ${devisSignes
+        ? `<button type="button" class="reste-carnet" data-filtre="depense"><span>${Number(P.taux_horaire) ? "Marge du chantier" : "Reste après dépenses"}<small>Devis signés ${eur(devisSignes)} €, moins ce que coûte le chantier</small></span><b>${eur(devisSignes - depenses - heures * (Number(P.taux_horaire) || 0))} €</b></button>`
+        : `<p class="gris" style="font-size:13px;margin:-2px 0 12px">Le reste après dépenses s'affiche ici dès qu'un devis de ce client est signé.</p>`}
       ${filtre === "depense" || filtre === "heures" ? bilan(tout) : ""}
       ${avants.length && apres.length ? `<button type="button" class="btn clair petit-btn" id="cMontage" style="margin-bottom:10px">Créer une image avant / après</button>` : ""}
       ${choixMontage ? `<div class="carte" style="margin-bottom:12px"><b>${choixMontage.avant ? "Touchez la photo d'après" : "Touchez la photo d'avant"}</b>
