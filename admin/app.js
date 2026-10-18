@@ -208,12 +208,15 @@ async function vueDocument(id, type, params) {
               <div class="actions-doc" style="margin:0"><button class="btn" id="envoiLien">${ICO.partage}Envoyer le lien</button><button class="btn discret" id="copieLien">Copier le lien</button></div></div>`) : ""}
           ${!estDevis && d.devis_numero ? `<p class="gris" style="font-size:14px">Facture du devis ${esc(d.devis_numero)}${d.devis_date ? " du " + dateFr(d.devis_date) : ""}.</p>` : ""}
           ${d.client_id ? `<p style="margin-top:8px"><a class="gris" href="#/client/${d.client_id}">Voir la fiche client ›</a></p>` : ""}
+          ${d.id && d.client_id ? `<h2 style="margin:22px 0 10px">Carnet de chantier</h2><div id="carnetDoc"><p class="gris">Chargement du carnet…</p></div>` : ""}
         </div>
       </div>
       <div class="barre-total"><div><small>${estDevis ? "Net à payer" : "Reste à payer"}</small><span class="montant" id="total"></span></div><small id="sousTotal" style="text-align:right"></small></div>`;
     dessinerLots();
     majTotal();
     lier();
+    const cd = document.getElementById("carnetDoc");
+    if (cd) import("./carnet.js").then(m => m.monterCarnet(cd, { db, client: { ...(d.client || {}), id: d.client_id }, toast, esc, erreur })).catch(erreur);
   };
 
   const dessinerLots = () => {
