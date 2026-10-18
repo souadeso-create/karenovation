@@ -149,6 +149,15 @@
   .ligne-chantier small { display: block; color: var(--gris); font-size: 12px; font-weight: 400; }
   .ligne-chantier .reste { text-align: right; font-family: var(--serif); font-size: 20px; white-space: nowrap; color: #2f6f4f; }
   .ligne-chantier .reste small { font-family: var(--sans); }
+  .a-reclamer, .ligne-bilan.a-reclamer span { color: #a3261f; }
+  .note-carnet.paiement { border-left: 4px solid #2f6f4f; }
+  .note-carnet.paiement p b { font-family: var(--serif); font-weight: 400; font-size: 18px; }
+  .section-fiche { margin-bottom: 14px; }
+  .section-fiche > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px; font-family: var(--serif); font-size: 22px; padding: 8px 0; }
+  .section-fiche > summary::-webkit-details-marker { display: none; }
+  .section-fiche > summary span { margin-left: auto; font-family: var(--sans); font-size: 13px; color: var(--gris); }
+  .section-fiche > summary::after { content: "+"; font-family: var(--sans); font-size: 22px; color: var(--gris); width: 18px; text-align: center; }
+  .section-fiche[open] > summary::after { content: "–"; }
   .lien-ticket { background: none; border: 0; padding: 0; color: var(--gris); text-decoration: underline; font: inherit; font-size: 13px; cursor: pointer; }
   .vignette em { position: absolute; left: 6px; right: 6px; top: 6px; background: rgba(255,255,255,.88); color: var(--encre); font-style: normal; font-size: 11px; padding: 2px 7px; border-radius: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .detail-ligne { font-size: 13px; color: var(--gris); margin-top: 6px; }

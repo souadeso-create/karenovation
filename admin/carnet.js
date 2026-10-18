@@ -7,12 +7,23 @@ const TYPES = {
   tache: { nom: "À faire", bouton: "+ À faire", aide: "Commander le receveur 120 × 90" },
   imprevu: { nom: "Imprévu", bouton: "+ Imprévu", aide: "Tuyau en plomb derrière le carrelage, à remplacer" },
   depense: { nom: "Dépense", bouton: "+ Dépense", aide: "Colle et joints chez le fournisseur" },
-  heures: { nom: "Heures", bouton: "+ Heures", aide: "Détail (facultatif) : pose du carrelage mural" }
+  heures: { nom: "Heures", bouton: "+ Heures", aide: "Détail (facultatif) : pose du carrelage mural" },
+  paiement: { nom: "Paiement reçu", bouton: "+ Paiement reçu", aide: "Détail (facultatif) : acompte par virement" }
 };
 export const CATEGORIES = { fournitures: "Fournitures et consommables", carburant: "Carburant", peage: "Péage et parking", location: "Location de matériel",
   decharge: "Déchetterie", outillage: "Outillage", vehicule: "Véhicule (entretien)", assurance: "Assurances", telephone: "Téléphone et internet",
   soustraitance: "Sous-traitance", repas: "Repas", autre: "Autre" };
 const duree = h => { const t = Math.round((Number(h) || 0) * 60); return `${Math.floor(t / 60)} h ${String(t % 60).padStart(2, "0")}`; };
+// échéancier des conditions générales : acompte à la signature, 70 % cumulés à mi-travaux, solde à la fin
+export const AVANCEMENTS = acompte => [["signature", "Signé", Number(acompte) || 30], ["mi", "Mi-travaux", 70], ["fin", "Terminé", 100]];
+// ce que le client a versé, comparé à ce qui est dû selon l'avancement
+export function etatPaiements(lignes, totalDevis, acompte) {
+  const verse = lignes.filter(l => l.type === "paiement").reduce((a, l) => a + (Number(l.montant) || 0), 0);
+  const av = lignes.filter(l => l.type === "avancement").sort((a, b) => a.created_at < b.created_at ? 1 : -1)[0];
+  const pct = av ? Number(av.montant) || 0 : totalDevis ? Number(acompte) || 30 : 0;
+  const du = Math.round(totalDevis * pct) / 100;
+  return { verse, pct, du, aReclamer: Math.max(0, Math.round((du - verse) * 100) / 100) };
+}
 const eur = n => (Number(n) || 0).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const estPhoto = l => (l.chemin || l.image) && l.type !== "depense";
 
@@ -48,8 +59,12 @@ async function partagerFichier(blob, nom) {
 }
 
 export async function monterCarnet(el, { db, client, P = {}, toast, esc, erreur }) {
-  let devisSignes = 0;
-  try { devisSignes = (await db.lister("documents")).filter(d => d.client_id === client.id && d.type === "devis" && d.statut === "signe").reduce((a, d) => a + (Number(d.total_ht) || 0), 0); } catch { /* pas grave */ }
+  let devisSignes = 0, acompte = Number(P.acompte_pct) || 30;
+  try {
+    const signes = (await db.lister("documents")).filter(d => d.client_id === client.id && d.type === "devis" && d.statut === "signe");
+    devisSignes = signes.reduce((a, d) => a + (Number(d.total_ht) || 0), 0);
+    if (signes[0]?.acompte_pct) acompte = Number(signes[0].acompte_pct);
+  } catch { /* pas grave */ }
   let etape = "pendant", filtre = "tout", saisie = null, lignes = [], urls = {}, enCours = 0, choixMontage = null;
   const caches = new Set(); // entrées retirées, en attente de suppression (on peut annuler)
 
@@ -72,6 +87,8 @@ export async function monterCarnet(el, { db, client, P = {}, toast, esc, erreur 
       const fin = l.fait ? new Date(new Date(l.created_at).getTime() + (Number(l.montant) || 0) * 3.6e6).toISOString() : null;
       return `<div class="note-carnet heures"><small>Heures · ${esc(ETAPES[l.etape])}</small><p><b>${l.fait ? duree(l.montant) : "en cours"}</b> · ${heure(l.created_at)} → ${fin ? heure(fin) : "…"}${l.texte && l.texte !== "Pointage" ? " · " + esc(l.texte) : ""}</p>${croix}</div>`;
     }
+    if (l.type === "paiement") return `<div class="note-carnet paiement"><small>Paiement reçu · ${new Date(l.created_at).toLocaleDateString("fr-FR")}</small><p><b>${eur(l.montant)} €</b>${l.texte ? " · " + esc(l.texte) : ""}</p>${croix}</div>`;
+    if (l.type === "avancement") { const a = AVANCEMENTS(acompte).find(x => x[2] === Number(l.montant)); return `<div class="note-carnet"><small>Avancement · ${heure(l.created_at)}</small><p>${esc(a ? a[1] : "Avancement")} : ${Number(l.montant)} % du devis dû</p>${croix}</div>`; }
     if (l.type === "depense") return `<div class="note-carnet depense">${tete}<p><b>${eur(l.montant)} €</b> · ${esc(CATEGORIES[l.categorie] || "Dépense")}${l.texte ? " · " + esc(l.texte) : ""}</p>${urls[l.id] ? `<button type="button" class="lien-ticket" data-voir="${l.id}">Voir le ticket</button>` : ""}${croix}</div>`;
     return `<div class="note-carnet ${l.type === "imprevu" ? "imprevu" : ""}">${tete}<p>${esc(l.texte).replace(/\n/g, "<br>")}</p>${croix}</div>`;
   };
@@ -104,6 +121,7 @@ export async function monterCarnet(el, { db, client, P = {}, toast, esc, erreur 
           ${saisie === "depense" ? `<div class="champ"><label for="cCategorie">Catégorie</label><select id="cCategorie">${Object.entries(CATEGORIES).map(([k, n]) => `<option value="${k}">${n}</option>`).join("")}</select></div>
             <div class="deux"><div class="champ"><label for="cMontant">Montant €</label><input type="number" id="cMontant" step="0.01" min="0" inputmode="decimal"></div>
             <div class="champ"><label>Ticket (facultatif)</label><label class="btn discret petit-btn" style="display:inline-flex">${"Photo du ticket"}<input type="file" id="cTicket" accept="image/*" hidden></label></div></div>` : ""}
+          ${saisie === "paiement" ? `<div class="champ"><label for="cMontant">Montant reçu €</label><input type="number" id="cMontant" step="0.01" min="0" inputmode="decimal"></div>` : ""}
           ${saisie === "heures" ? `<div class="deux"><div class="champ"><label for="cHeures">Nombre d'heures</label><input type="number" id="cHeures" step="0.25" min="0" inputmode="decimal" placeholder="7,5"></div>
             <div class="champ"><label for="cDebut">Début</label><input type="time" id="cDebut" value="08:00"></div></div>` : ""}
           <textarea id="cTexte" rows="${saisie === "tache" ? 1 : 3}" placeholder="${esc(saisie === "depense" ? "Détail (facultatif) : plein du camion, sacs de colle…" : T.aide)}"></textarea>
@@ -120,6 +138,14 @@ export async function monterCarnet(el, { db, client, P = {}, toast, esc, erreur 
       ${devisSignes
         ? `<button type="button" class="reste-carnet" data-filtre="depense"><span>${Number(P.taux_horaire) ? "Marge du chantier" : "Reste après dépenses"}<small>Devis signés ${eur(devisSignes)} €, moins ce que coûte le chantier</small></span><b>${eur(devisSignes - depenses - heures * (Number(P.taux_horaire) || 0))} €</b></button>`
         : `<p class="gris" style="font-size:13px;margin:-2px 0 12px">Le reste après dépenses s'affiche ici dès qu'un devis de ce client est signé.</p>`}
+      ${devisSignes ? (() => { const e = etatPaiements(tout, devisSignes, acompte); return `<div class="carte paiements-carnet" style="margin-bottom:12px">
+        <b>Paiements du client</b>
+        <div class="palette" style="margin:8px 0 6px">${AVANCEMENTS(acompte).map(([k, n, p]) => `<button type="button" class="btn ${e.pct === p ? "" : "discret"} petit-btn" data-avancement="${p}">${n} · ${p} %</button>`).join("")}</div>
+        <div class="ligne-bilan"><span>Dû à ce stade (${e.pct} % de ${eur(devisSignes)} €)</span><span>${eur(e.du)} €</span></div>
+        <div class="ligne-bilan"><span>Déjà versé</span><span>${eur(e.verse)} €</span></div>
+        <div class="ligne-bilan total ${e.aReclamer ? "a-reclamer" : ""}"><span>${e.aReclamer ? "À réclamer maintenant" : "✓ Le client est à jour"}</span><span>${e.aReclamer ? eur(e.aReclamer) + " €" : ""}</span></div>
+        <div class="ligne-bilan"><span>Reste à payer sur le devis</span><span>${eur(Math.max(0, devisSignes - e.verse))} €</span></div>
+        <div class="actions-doc" style="margin:8px 0 0"><button type="button" class="btn clair petit-btn" data-saisie="paiement">+ Paiement reçu</button></div></div>`; })() : ""}
       ${filtre === "depense" || filtre === "heures" ? bilan(tout) : ""}
       ${avants.length && apres.length ? `<button type="button" class="btn clair petit-btn" id="cMontage" style="margin-bottom:10px">Créer une image avant / après</button>` : ""}
       ${choixMontage ? `<div class="carte" style="margin-bottom:12px"><b>${choixMontage.avant ? "Touchez la photo d'après" : "Touchez la photo d'avant"}</b>
@@ -193,6 +219,9 @@ export async function monterCarnet(el, { db, client, P = {}, toast, esc, erreur 
     el.querySelectorAll("[data-voir]").forEach(b => b.onclick = () => voir(b.dataset.voir));
     el.querySelectorAll("[data-retirer]").forEach(b => b.onclick = () => retirer(b.dataset.retirer));
     el.querySelectorAll("[data-saisie]").forEach(b => b.onclick = () => { saisie = b.dataset.saisie || null; ticket = null; dessiner(); el.querySelector("#cTexte")?.focus(); });
+    el.querySelectorAll("[data-avancement]").forEach(b => b.onclick = async () => {
+      try { const n = await db.ajouterCarnet({ client_id: client.id, etape, type: "avancement", montant: Number(b.dataset.avancement) }); lignes.unshift(n); toast("Avancement noté ✓"); dessiner(); } catch (e) { erreur(e); }
+    });
     const ar = el.querySelector("#cArrive");
     if (ar) ar.onclick = async () => {
       try { const n = await db.ajouterCarnet({ client_id: client.id, etape, type: "heures", fait: false, texte: "Pointage" }); lignes.unshift(n); toast("Bonne journée ✓"); dessiner(); } catch (e) { erreur(e); }
@@ -221,9 +250,10 @@ export async function monterCarnet(el, { db, client, P = {}, toast, esc, erreur 
         } catch (e) { erreur(e); }
         return;
       }
-      if (saisie === "depense" ? !montant : !texte) return toast(saisie === "depense" ? "Indiquez le montant." : "Écrivez quelque chose.");
+      const avecMontant = saisie === "depense" || saisie === "paiement";
+      if (avecMontant ? !montant : !texte) return toast(avecMontant ? "Indiquez le montant." : "Écrivez quelque chose.");
       try {
-        const n = await db.ajouterCarnet({ client_id: client.id, etape, type: saisie, texte: texte || null, ...(saisie === "depense" ? { montant, categorie: el.querySelector("#cCategorie").value } : {}) }, saisie === "depense" ? ticket : null);
+        const n = await db.ajouterCarnet({ client_id: client.id, etape, type: saisie, texte: texte || null, ...(saisie === "depense" ? { montant, categorie: el.querySelector("#cCategorie").value } : saisie === "paiement" ? { montant } : {}) }, saisie === "depense" ? ticket : null);
         if (n.image || (ticket && n.chemin)) urls[n.id] = n.image || URL.createObjectURL(ticket);
         lignes.unshift(n); toast(`${TYPES[saisie].nom} ajouté${saisie === "note" || saisie === "depense" ? "e" : ""} ✓`); saisie = null; ticket = null; dessiner();
       } catch (e) { erreur(e); }

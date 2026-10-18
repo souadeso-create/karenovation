@@ -2,7 +2,7 @@
 import * as db from "./store.js";
 import { UNITES } from "./donnees.js";
 import { telechargerPDF, totaux, eur } from "./pdf.js";
-import { CATEGORIES } from "./carnet.js";
+import { CATEGORIES, etatPaiements } from "./carnet.js";
 
 const vue = document.getElementById("vue");
 const nav = document.getElementById("nav");
@@ -81,7 +81,8 @@ function confirmer(message, oui = "Confirmer") {
 
 /* =================== Accueil =================== */
 async function vueAccueil() {
-  const [docs, clients, demandes, depenses] = await Promise.all([db.lister("documents"), db.lister("clients"), listerDemandes(), db.listerDepenses().catch(() => [])]);
+  const [docs, clients, demandes, depenses] = await Promise.all([db.lister("documents"), db.lister("clients"), listerDemandes(), db.listerDepenses(["depense", "paiement", "avancement"]).catch(() => [])]);
+  const montants = depenses.splice(0); depenses.push(...montants.filter(x => (x.type || "depense") === "depense"));
   const nouvelles = (demandes || []).filter(x => x.statut === "nouvelle");
   const relances = docs.filter(aRelancer);
   const devisAttente = docs.filter(d => d.type === "devis" && ["brouillon", "envoye"].includes(d.statut));
@@ -97,7 +98,7 @@ async function vueAccueil() {
       <div class="stat"><span class="petit">Encaissé ce mois</span><b>${eur(somme(encaisse))} €</b></div>
       <div class="stat"><span class="petit">Clients</span><b>${clients.length}</b></div>
     </div>
-    ${blocChantiers(docs, clients, depenses)}
+    ${blocChantiers(docs, clients, depenses, montants)}
     ${blocDepenses(depenses, clients, mois)}
     ${nouvelles.length ? `<a class="alerte" href="#/demandes">${ICO.boite}<span><b>${nouvelles.length} nouvelle${nouvelles.length > 1 ? "s" : ""} demande${nouvelles.length > 1 ? "s" : ""} de devis</b><small>${esc(nouvelles.slice(0, 3).map(x => x.nom).join(", "))}</small></span><span>›</span></a>` : ""}
     ${relances.length ? `<h2 style="margin-bottom:12px">À relancer</h2>
@@ -122,7 +123,7 @@ async function vueAccueil() {
 }
 
 // Chantiers en cours : un devis signé dont le PV n'est pas encore signé ; un toucher ouvre la fiche du client (carnet)
-function blocChantiers(docs, clients, depenses) {
+function blocChantiers(docs, clients, depenses, montants) {
   const signes = docs.filter(d => d.type === "devis" && d.statut === "signe" && d.client_id);
   if (!signes.length) return "";
   const parClient = {};
@@ -142,8 +143,10 @@ function blocChantiers(docs, clients, depenses) {
     <div id="chantiers">${Object.entries(parClient).map(([id, ds]) => {
       const c = clients.find(x => x.id === id), total = ds.reduce((a, d) => a + totaux(d).ht, 0);
       const dep = depenses.filter(x => x.client_id === id).reduce((a, x) => a + (Number(x.montant) || 0), 0);
+      const e = etatPaiements(montants.filter(x => x.client_id === id), total, ds[0].acompte_pct);
       return `<a class="ligne-chantier" href="#/client/${id}?carnet=1">${ds.map(d => `<i data-pv-fini="${d.id}"></i>`).join("")}
-        <span><b>${esc(c ? nomClient(c) : nomClient(ds[0].client))}</b><small>Devis ${eur(total)} € · dépenses ${eur(dep)} €</small></span>
+        <span><b>${esc(c ? nomClient(c) : nomClient(ds[0].client))}</b><small>Devis ${eur(total)} € · dépenses ${eur(dep)} €</small>
+          <small>Versé ${eur(e.verse)} € · ${e.aReclamer ? `<span class="a-reclamer">à réclamer ${eur(e.aReclamer)} € (${e.pct} %)</span>` : "à jour"}</small></span>
         <span class="reste"><small>Reste</small>${eur(total - dep)} €</span></a>`;
     }).join("")}</div>
     <p class="gris" id="chantiersVide" hidden style="font-size:14px">Tous les chantiers signés ont leur PV : rien en cours.</p>
@@ -598,10 +601,11 @@ async function vueClient(id, params) {
   vue.innerHTML = `
     <div class="entete"><div><div class="petit">Client</div><h1>${c.id ? esc(nomClient(c)) : "Nouveau client"}</h1></div></div>
     <div class="deux-col">
-      <form class="carte" id="fc">${champsClient(c)}
+      <details class="section-fiche carte" ${c.id ? "" : "open"}><summary>Coordonnées<span>${esc([c.tel, c.ville].filter(Boolean).join(" · "))}</span></summary>
+      <form id="fc" style="margin-top:10px">${champsClient(c)}
         <div class="actions-doc"><button class="btn">Enregistrer</button>
         ${c.id ? `<button type="button" class="btn danger" id="archiver">Archiver</button>` : ""}</div>
-      </form>
+      </form></details>
       <div>
         ${c.id ? `
         <div class="actions-doc">
@@ -610,14 +614,14 @@ async function vueClient(id, params) {
           <a class="btn clair" href="#/3d?client=${c.id}">${ICO.cube}Simulation 3D</a>
           ${c.tel ? `<a class="btn discret" href="tel:${esc(c.tel.replace(/\s/g, ""))}">Appeler</a>` : ""}
         </div>
-        ${docs.some(d => d.type === "devis" && d.statut === "signe") ? `<h2 style="margin:8px 0 10px">PV de fin de chantier</h2>
-        <div class="liste" id="listePV" style="margin-bottom:22px">${docs.filter(d => d.type === "devis" && d.statut === "signe").map(d => `<a class="ligne-liste" href="#/reception/${d.id}"><div><b>PV · devis ${esc(d.numero)}</b><small data-pv="${d.id}">${esc(d.objet || "")}</small></div><span class="gris">›</span></a>`).join("")}</div>` : ""}
-        <h2 style="margin:8px 0 10px">Carnet de chantier</h2>
-        <div id="carnet"><p class="gris">Chargement du carnet…</p></div>
-        <h2 style="margin:22px 0 10px">Documents</h2>
-        <div class="liste">${docs.map(ligneDoc).join("") || '<p class="gris">Aucun devis ni facture.</p>'}</div>
-        <h2 style="margin:22px 0 10px">Simulations 3D</h2>
-        <div class="liste">${sims.map(s => `<a class="ligne-liste" href="#/3d?sim=${s.id}"><div><b>${esc(s.nom || "Simulation")}</b><small>${dateFr(String(s.created_at).slice(0, 10))}</small></div>${s.image ? `<img src="${s.image}" alt="" style="width:64px;height:48px;object-fit:cover;border-radius:8px">` : ""}</a>`).join("") || '<p class="gris">Aucune simulation.</p>'}</div>` : ""}
+        ${docs.some(d => d.type === "devis" && d.statut === "signe") ? `<details class="section-fiche" open><summary>PV de fin de chantier</summary>
+        <div class="liste" id="listePV" style="margin-bottom:10px">${docs.filter(d => d.type === "devis" && d.statut === "signe").map(d => `<a class="ligne-liste" href="#/reception/${d.id}"><div><b>PV · devis ${esc(d.numero)}</b><small data-pv="${d.id}">${esc(d.objet || "")}</small></div><span class="gris">›</span></a>`).join("")}</div></details>` : ""}
+        <details class="section-fiche" open><summary>Carnet de chantier</summary>
+        <div id="carnet" style="margin-top:6px"><p class="gris">Chargement du carnet…</p></div></details>
+        <details class="section-fiche"><summary>Devis et factures<span>${docs.length}</span></summary>
+        <div class="liste" style="margin-top:6px">${docs.map(ligneDoc).join("") || '<p class="gris">Aucun devis ni facture.</p>'}</div></details>
+        <details class="section-fiche"><summary>Simulations 3D<span>${sims.length}</span></summary>
+        <div class="liste" style="margin-top:6px">${sims.map(s => `<a class="ligne-liste" href="#/3d?sim=${s.id}"><div><b>${esc(s.nom || "Simulation")}</b><small>${dateFr(String(s.created_at).slice(0, 10))}</small></div>${s.image ? `<img src="${s.image}" alt="" style="width:64px;height:48px;object-fit:cover;border-radius:8px">` : ""}</a>`).join("") || '<p class="gris">Aucune simulation.</p>'}</div></details>` : ""}
       </div>
     </div>`;
   // état de chaque PV : à faire, enregistré, ou signé
@@ -629,7 +633,7 @@ async function vueClient(id, params) {
   });
   if (c.id) import("./carnet.js").then(async m => {
     await m.monterCarnet(document.getElementById("carnet"), { db, client: c, P, toast, esc, erreur });
-    if (params?.get("carnet")) document.getElementById("carnet").previousElementSibling?.scrollIntoView({ block: "start" });
+    if (params?.get("carnet")) document.getElementById("carnet").closest("details")?.scrollIntoView({ block: "start" });
   }).catch(erreur);
   document.getElementById("fc").onsubmit = async e => {
     e.preventDefault();

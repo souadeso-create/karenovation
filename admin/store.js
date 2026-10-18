@@ -122,11 +122,11 @@ export async function ajouterCarnet(entree, photo) {
   }
   return enregistrer("carnet", ligne);
 }
-// toutes les dépenses du carnet, tous chantiers confondus (sans les photos)
-export async function listerDepenses() {
-  if (MODE_ESSAI) return lireLocal("carnet").filter(x => x.type === "depense").map(({ image, ...x }) => x);
-  let r = await sb.from("carnet").select("id,client_id,created_at,montant,categorie,texte").eq("type", "depense");
-  if (r.error) r = await sb.from("carnet").select("id,client_id,created_at,montant,texte").eq("type", "depense");
+// les montants du carnet (dépenses, paiements reçus, avancement), tous chantiers confondus, sans les photos
+export async function listerDepenses(types = ["depense"]) {
+  if (MODE_ESSAI) return lireLocal("carnet").filter(x => types.includes(x.type)).map(({ image, ...x }) => x);
+  let r = await sb.from("carnet").select("id,client_id,created_at,montant,categorie,texte,type").in("type", types);
+  if (r.error) r = await sb.from("carnet").select("id,client_id,created_at,montant,texte,type").in("type", types);
   if (r.error) throw r.error;
   return r.data;
 }
