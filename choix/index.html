@@ -76,7 +76,7 @@
 
   let s;
   function afficher() {
-    const choix = Array.isArray(s.choix) ? s.choix : [];
+    const choix = Array.isArray(s.choix) ? s.choix : [], achats = Array.isArray(s.achats) ? s.achats : [];
     vue.innerHTML = `
       <span class="label">Votre projet</span>
       <h1>${esc(s.nom || "Votre salle de bain")}</h1>
@@ -84,6 +84,9 @@
       <div class="carte"><h2>Vos choix</h2>
         ${choix.map(c => `<div class="choix">${c.couleur ? `<i style="background:${esc(c.couleur)}"></i>` : ""}<div><small>${esc(c.titre)}</small>${esc(c.valeur)}</div></div>`).join("")}
       </div>
+      ${achats.length ? `<div class="carte"><h2>Ce que vous achetez</h2>
+        ${achats.map(a => `<div class="ligne"><div>${esc(a.titre)}<small>${esc(a.valeur)}${a.detail ? " · " + esc(a.detail) : ""}</small></div>${a.quantite ? `<div class="m">${esc(a.quantite)}</div>` : ""}</div>`).join("")}
+        <p class="gris" style="font-size:13px;margin-top:10px">Colles, joints, produits d'étanchéité et de pose : fournis par KA Rénovation.</p></div>` : ""}
       ${zoneValidation()}`;
     const f = document.getElementById("valider");
     if (f) {
@@ -112,7 +115,7 @@
   function zoneValidation() {
     if (s.valide_le) {
       const q = new Date(s.valide_le);
-      return `<div class="carte signe" id="zone-validation"><b>✓ Choix validés</b>Le ${q.toLocaleDateString("fr-FR", { dateStyle: "long" })} à ${q.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} par ${esc(s.valide_nom)}. Merci ! Nous commandons les matériaux sur cette base.</div>`;
+      return `<div class="carte signe" id="zone-validation"><b>✓ Choix validés</b>Le ${q.toLocaleDateString("fr-FR", { dateStyle: "long" })} à ${q.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} par ${esc(s.valide_nom)}. Merci ! Vous pouvez acheter vos matériaux avec la liste ci-dessus.</div>`;
     }
     return `<form class="carte" id="valider">
       <h2 id="zone-validation">Je valide mes choix</h2>

@@ -862,9 +862,6 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
   function texteCommande() {
     const f = v => (Math.ceil(v * 10) / 10).toLocaleString("fr-FR");
     return ["Bonjour,", "", "Voici ma commande pour un chantier de salle de bain :", "",
-      "CARRELAGE",
-      ...carrelageACommander().map(c => `- ${c.titre} : ${c.matiere}, ${c.format} — ${f(c.total)} m²${c.n ? ` (≈ ${c.n.toLocaleString("fr-FR")} ${c.unite})` : ""}`),
-      "", "FOURNITURES",
       ...fournitures().map(x => `- ${x.nom} : ${x.qte}`),
       "", "Merci de me confirmer la disponibilité et le délai.", "KA Rénovation — 07 63 14 76 27"].join("\n");
   }
@@ -882,17 +879,17 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     const bloc = (v, t) => `<div><b style="font-family:var(--serif);font-size:20px;font-weight:400">${f(v)} m²</b><br><span class="gris" style="font-size:13px">${t}</span></div>`;
     document.getElementById("metre").innerHTML = `<div class="petit" style="margin-bottom:8px">Métré</div>
       <div class="deux" style="gap:12px">${bloc(m.sol, `sol · ${FORMATS[etat.sol.format].nom}`)}${bloc(m.murs, "faïence murale")}${bloc(m.peinture, "peinture murs")}${bloc(m.plafond, "plafond")}</div>
-      <details class="groupe-ajout deroule-carrelage" style="margin-top:10px;border-bottom:0;border-top:1px solid var(--sable)" ${ouvert ? "open" : ""}><summary>Carrelage à commander<span>${f(cmd.reduce((a, c) => a + Math.ceil(c.total * 10) / 10, 0))} m² en tout</span></summary>
+      <details class="groupe-ajout deroule-carrelage" style="margin-top:10px;border-bottom:0;border-top:1px solid var(--sable)" ${ouvert ? "open" : ""}><summary>Carrelage à acheter (client)<span>${f(cmd.reduce((a, c) => a + Math.ceil(c.total * 10) / 10, 0))} m² en tout</span></summary>
       ${cmd.map(c => `<div style="display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--sable)">
         <div><b style="font-weight:600">${c.titre}</b><br><span class="gris" style="font-size:13px">${esc(c.matiere)} · ${esc(c.format)}<br>${f(c.surf)} m² posés + ${Math.round(c.chute * 100)} % de chutes</span></div>
         <div style="text-align:right;white-space:nowrap"><b style="font-family:var(--serif);font-size:20px;font-weight:400">${f(Math.ceil(c.total * 10) / 10)} m²</b>${c.n ? `<br><span class="gris" style="font-size:13px">≈ ${c.n.toLocaleString("fr-FR")} ${c.unite}</span>` : ""}</div></div>`).join("")}
       <p class="gris" style="font-size:12px;margin-top:6px">Arrondissez au nombre de boîtes du fournisseur.</p></details>
-      <details class="groupe-ajout deroule-fournitures" style="border-bottom:0;border-top:1px solid var(--sable)" ${ouvertF ? "open" : ""}><summary>Fournitures<span>${fourn.length} articles</span></summary>
+      <details class="groupe-ajout deroule-fournitures" style="border-bottom:0;border-top:1px solid var(--sable)" ${ouvertF ? "open" : ""}><summary>Mes consommables<span>${fourn.length} articles</span></summary>
       ${fourn.map(x => `<div style="display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--sable)">
         <div><b style="font-weight:600">${esc(x.nom)}</b>${x.detail ? `<br><span class="gris" style="font-size:13px">${esc(x.detail)}</span>` : ""}</div>
         <div style="text-align:right;white-space:nowrap;font-weight:600">${esc(x.qte)}</div></div>`).join("")}
       <p class="gris" style="font-size:12px;margin-top:6px">Quantités courantes de pose : vérifiez la fiche du produit choisi.</p></details>
-      <div class="actions-doc" style="margin:12px 0 0"><button type="button" class="btn clair petit-btn" data-commande="envoyer">Envoyer la commande au fournisseur</button><button type="button" class="btn discret petit-btn" data-commande="copier">Copier</button></div>`;
+      <div class="actions-doc" style="margin:12px 0 0"><button type="button" class="btn clair petit-btn" data-commande="envoyer">Commander mes consommables</button><button type="button" class="btn discret petit-btn" data-commande="copier">Copier</button></div>`;
   }
 
   /* --- Sélection, déplacement au doigt --- */
@@ -1441,6 +1438,20 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
       l.push(v.valeur ? { titre: nom, valeur: v.valeur, couleur: v.couleur } : { titre: "Équipement", valeur: nom, couleur: null }); });
     return l;
   }
+  // ce que le client achète lui-même, avec les quantités
+  function achatsClient() {
+    const m = metre(), { l, p } = etat.dims, f = v => (Math.ceil(v * 10) / 10).toLocaleString("fr-FR"), a = [];
+    carrelageACommander().forEach(c => a.push({ titre: `Carrelage ${c.titre.toLowerCase()}`, valeur: `${c.matiere}, ${c.format}`,
+      quantite: `${f(c.total)} m²`, detail: `${c.n ? `≈ ${c.n.toLocaleString("fr-FR")} ${c.unite}, ` : ""}${Math.round(c.chute * 100)} % de chutes compris, à arrondir au nombre de boîtes` }));
+    const litres = s => Math.max(1, Math.ceil(s * 2 / 10)); // 2 couches, 10 m² par litre
+    if (m.peinture > .5) a.push({ titre: "Peinture des murs", valeur: `${PEINTURES[etat.peinture] || ""}, pièce humide`, quantite: `${litres(m.peinture)} L`, detail: `${f(m.peinture)} m², 2 couches` });
+    a.push({ titre: "Peinture du plafond", valeur: "Blanc mat, pièce humide", quantite: `${litres(l * p)} L`, detail: `${f(l * p)} m², 2 couches` });
+    const vus = new Map();
+    etat.objets.filter(o => ["Sanitaires", "Meubles"].includes(CAT[o.type].groupe)).forEach(o => vus.set(o.type, (vus.get(o.type) || 0) + 1));
+    vus.forEach((n, t) => a.push({ titre: CAT[t].nom, valeur: "Voir le détail dans vos choix", quantite: String(n) }));
+    a.push({ titre: "Robinetterie", valeur: ROBINETTERIE[etat.robinetterie]?.nom || "", quantite: "" });
+    return a;
+  }
   const lienChoix = j => location.origin + location.pathname.replace(/admin\/.*$/, "") + "choix/?c=" + j;
   function majValidation() {
     const p = document.getElementById("etatValidation"); if (!p) return;
@@ -1451,7 +1462,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
   document.getElementById("validerClient").onclick = async () => {
     try {
       if (!client && !confirm("Aucun client n'est associé à cette simulation. Continuer quand même ?")) return;
-      etat.choix = choixClient();
+      etat.choix = choixClient(); etat.achats = achatsClient();
       const s = await enregistrer({ valide_le: null, valide_nom: null, ...(simId && validation.jeton ? {} : { jeton: crypto.randomUUID() }) });
       const lien = lienChoix(s.jeton);
       const texte = `Bonjour,
@@ -1501,13 +1512,11 @@ KA Rénovation — 07 63 14 76 27`;
       if (m.peinture > .5) ajoute("Peinture murs", "Peinture / Finitions", arr(m.peinture), "m2");
       ajoute("Peinture plafond", "Finitions", arr(m.plafond), "m2");
       ajoute("Nettoyage fin de chantier", "Finitions", 1);
-      // fournitures : le carrelage au m² (chutes comprises), puis les fournitures de pose et de placo, détaillées
-      carrelageACommander().forEach(c => ajoute(`Fourniture carrelage ${c.titre.toLowerCase()}`, "Fournitures", Math.ceil(c.total * 10) / 10, "m2",
-        `${c.matiere}, ${c.format}, ${Math.round(c.chute * 100)} % de chutes compris`));
+      // consommables de l'artisan (le client achète lui-même carrelage, sanitaires, meubles et peinture)
       const PLACO = /Rails|Montants|Cornières|Laine|Fourrures|Suspentes|Plaques|Vis TTPC|Bande à joint|Enduit/;
       const fo = fournitures(), pose = fo.filter(x => !PLACO.test(x.nom)), placo = fo.filter(x => PLACO.test(x.nom));
       const detail = l => l.map(x => `${x.nom} : ${x.qte}`).join(" ; ");
-      if (pose.length) ajoute("Fournitures de pose", "Fournitures", 1, "forfait", detail(pose));
+      if (pose.length) ajoute("Consommables de pose", "Fournitures", 1, "forfait", detail(pose));
       if (placo.length) ajoute("Fournitures placo et ossature", "Fournitures", 1, "forfait", detail(placo));
       ajoute("Frais de déplacement", "Déplacement", 1, "forfait");
       await enregistrer();

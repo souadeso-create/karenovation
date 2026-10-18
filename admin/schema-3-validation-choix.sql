@@ -9,7 +9,7 @@ create unique index if not exists simulations_jeton on simulations (jeton);
 -- Lecture d'une simulation par son lien secret : l'image, la liste des choix, l'état de la validation
 create or replace function choix_public(j uuid) returns json
 language sql security definer set search_path = public as $$
-  select json_build_object('nom', s.nom, 'image', s.image, 'choix', s.data -> 'choix',
+  select json_build_object('nom', s.nom, 'image', s.image, 'choix', s.data -> 'choix', 'achats', s.data -> 'achats',
                            'valide_le', s.valide_le, 'valide_nom', s.valide_nom,
                            'client', (select concat_ws(' ', c.civilite, c.nom) from clients c where c.id = s.client_id))
   from simulations s where s.jeton = j;
