@@ -8,6 +8,8 @@ const TYPES = {
   imprevu: { nom: "Imprévu", bouton: "+ Imprévu", aide: "Tuyau en plomb derrière le carrelage, à remplacer" },
   depense: { nom: "Dépense", bouton: "+ Dépense", aide: "Colle et joints chez le fournisseur" }
 };
+const CATEGORIES = { fournitures: "Fournitures et consommables", carburant: "Carburant", peage: "Péage et parking", location: "Location de matériel",
+  decharge: "Déchetterie", outillage: "Outillage", soustraitance: "Sous-traitance", repas: "Repas", autre: "Autre" };
 const eur = n => (Number(n) || 0).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const estPhoto = l => (l.chemin || l.image) && l.type !== "depense";
 
@@ -43,6 +45,8 @@ async function partagerFichier(blob, nom) {
 }
 
 export async function monterCarnet(el, { db, client, toast, esc, erreur }) {
+  let devisSignes = 0;
+  try { devisSignes = (await db.lister("documents")).filter(d => d.client_id === client.id && d.type === "devis" && d.statut === "signe").reduce((a, d) => a + (Number(d.total_ht) || 0), 0); } catch { /* pas grave */ }
   let etape = "pendant", filtre = "tout", saisie = null, lignes = [], urls = {}, enCours = 0, choixMontage = null;
   const caches = new Set(); // entrées retirées, en attente de suppression (on peut annuler)
 
@@ -61,7 +65,7 @@ export async function monterCarnet(el, { db, client, toast, esc, erreur }) {
     const tete = `<small>${esc(TYPES[l.type]?.nom || "Note")} · ${esc(ETAPES[l.etape])} · ${heure(l.created_at)}</small>`;
     const croix = `<button type="button" class="icone" data-retirer="${l.id}" aria-label="Retirer">✕</button>`;
     if (l.type === "tache") return `<div class="note-carnet tache ${l.fait ? "faite" : ""}"><label><input type="checkbox" data-fait="${l.id}" ${l.fait ? "checked" : ""}><span>${esc(l.texte)}</span></label>${croix}</div>`;
-    if (l.type === "depense") return `<div class="note-carnet depense">${tete}<p><b>${eur(l.montant)} €</b> · ${esc(l.texte || "")}</p>${urls[l.id] ? `<button type="button" class="lien-ticket" data-voir="${l.id}">Voir le ticket</button>` : ""}${croix}</div>`;
+    if (l.type === "depense") return `<div class="note-carnet depense">${tete}<p><b>${eur(l.montant)} €</b> · ${esc(CATEGORIES[l.categorie] || "Dépense")}${l.texte ? " · " + esc(l.texte) : ""}</p>${urls[l.id] ? `<button type="button" class="lien-ticket" data-voir="${l.id}">Voir le ticket</button>` : ""}${croix}</div>`;
     return `<div class="note-carnet ${l.type === "imprevu" ? "imprevu" : ""}">${tete}<p>${esc(l.texte).replace(/\n/g, "<br>")}</p>${croix}</div>`;
   };
 
@@ -83,9 +87,10 @@ export async function monterCarnet(el, { db, client, toast, esc, erreur }) {
           ${Object.entries(TYPES).map(([k, t]) => `<button type="button" class="btn ${saisie === k ? "" : "clair"} petit-btn" data-saisie="${k}">${t.bouton}</button>`).join("")}
         </div>
         ${T ? `<div style="margin-top:10px">
-          ${saisie === "depense" ? `<div class="deux"><div class="champ"><label for="cMontant">Montant €</label><input type="number" id="cMontant" step="0.01" min="0" inputmode="decimal"></div>
+          ${saisie === "depense" ? `<div class="champ"><label for="cCategorie">Catégorie</label><select id="cCategorie">${Object.entries(CATEGORIES).map(([k, n]) => `<option value="${k}">${n}</option>`).join("")}</select></div>
+            <div class="deux"><div class="champ"><label for="cMontant">Montant €</label><input type="number" id="cMontant" step="0.01" min="0" inputmode="decimal"></div>
             <div class="champ"><label>Ticket (facultatif)</label><label class="btn discret petit-btn" style="display:inline-flex">${"Photo du ticket"}<input type="file" id="cTicket" accept="image/*" hidden></label></div></div>` : ""}
-          <textarea id="cTexte" rows="${saisie === "tache" ? 1 : 3}" placeholder="${esc(T.aide)}"></textarea>
+          <textarea id="cTexte" rows="${saisie === "tache" ? 1 : 3}" placeholder="${esc(saisie === "depense" ? "Détail (facultatif) : plein du camion, sacs de colle…" : T.aide)}"></textarea>
           <div class="actions-doc" style="margin:8px 0 0"><button type="button" class="btn petit-btn" id="cOk">Ajouter</button><button type="button" class="btn discret petit-btn" data-saisie="">Annuler</button></div>
         </div>` : ""}
         ${enCours ? `<p class="gris" style="font-size:13px;margin-top:8px">Envoi de ${enCours} photo${enCours > 1 ? "s" : ""}…</p>` : ""}
@@ -95,6 +100,7 @@ export async function monterCarnet(el, { db, client, toast, esc, erreur }) {
         <button type="button" data-filtre="imprevu"><b>${imprevus}</b>imprévu${imprevus > 1 ? "s" : ""}</button>
         <button type="button" data-filtre="depense"><b>${eur(depenses)} €</b>dépenses</button>
       </div>
+      ${filtre === "depense" ? bilan(tout) : ""}
       ${avants.length && apres.length ? `<button type="button" class="btn clair petit-btn" id="cMontage" style="margin-bottom:10px">Créer une image avant / après</button>` : ""}
       ${choixMontage ? `<div class="carte" style="margin-bottom:12px"><b>${choixMontage.avant ? "Touchez la photo d'après" : "Touchez la photo d'avant"}</b>
         <p class="gris" style="font-size:13px">L'image se fait au format vertical, pour TikTok, Instagram ou Facebook.</p>
@@ -107,6 +113,19 @@ export async function monterCarnet(el, { db, client, toast, esc, erreur }) {
           ${g.l.filter(l => l.type !== "photo").map(carteEntree).join("")}
         </div>`).join("") : `<p class="gris">${filtre === "tout" ? "Rien dans le carnet pour l'instant : ajoutez les photos d'avant travaux dès la première visite." : "Rien ici."}</p>`}`;
     lier();
+  };
+
+  // ce que coûte le chantier à l'artisan, par catégorie, et ce qu'il reste sur les devis signés
+  const bilan = tout => {
+    const deps = tout.filter(l => l.type === "depense"), parCat = {};
+    deps.forEach(l => { const k = l.categorie || "autre"; parCat[k] = (parCat[k] || 0) + (Number(l.montant) || 0); });
+    const total = Object.values(parCat).reduce((a, b) => a + b, 0);
+    return `<div class="carte" style="margin-bottom:12px"><b>Ce que coûte le chantier</b>
+      ${Object.entries(parCat).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<div class="ligne-bilan"><span>${esc(CATEGORIES[k] || k)}</span><span>${eur(v)} €</span></div>`).join("") || '<p class="gris" style="font-size:13px">Aucune dépense notée.</p>'}
+      <div class="ligne-bilan total"><span>Total des dépenses</span><span>${eur(total)} €</span></div>
+      ${devisSignes ? `<div class="ligne-bilan"><span>Devis signés</span><span>${eur(devisSignes)} €</span></div>
+      <div class="ligne-bilan total"><span>Reste après dépenses</span><span>${eur(devisSignes - total)} €</span></div>
+      <p class="gris" style="font-size:12px;margin-top:6px">Avant votre temps de travail et vos charges.</p>` : ""}</div>`;
   };
 
   // retrait annulable : l'entrée disparaît, et n'est vraiment supprimée qu'après 8 secondes
@@ -162,7 +181,7 @@ export async function monterCarnet(el, { db, client, toast, esc, erreur }) {
       const texte = el.querySelector("#cTexte").value.trim(), montant = Number(el.querySelector("#cMontant")?.value || 0);
       if (saisie === "depense" ? !montant : !texte) return toast(saisie === "depense" ? "Indiquez le montant." : "Écrivez quelque chose.");
       try {
-        const n = await db.ajouterCarnet({ client_id: client.id, etape, type: saisie, texte: texte || null, ...(saisie === "depense" ? { montant } : {}) }, saisie === "depense" ? ticket : null);
+        const n = await db.ajouterCarnet({ client_id: client.id, etape, type: saisie, texte: texte || null, ...(saisie === "depense" ? { montant, categorie: el.querySelector("#cCategorie").value } : {}) }, saisie === "depense" ? ticket : null);
         if (n.image || (ticket && n.chemin)) urls[n.id] = n.image || URL.createObjectURL(ticket);
         lignes.unshift(n); toast(`${TYPES[saisie].nom} ajouté${saisie === "note" || saisie === "depense" ? "e" : ""} ✓`); saisie = null; ticket = null; dessiner();
       } catch (e) { erreur(e); }
