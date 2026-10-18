@@ -526,6 +526,17 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
   // reflets dosés : forts sur le métal et le verre, discrets ailleurs
   function doser() { scene.traverse(m => { const mt = m.material; if (!mt || mt.userData.dose) return; mt.userData.dose = true;
     if (mt.envMapIntensity === 1) mt.envMapIntensity = mt.metalness > .5 ? .9 : mt.roughness < .2 ? .5 : .25; }); }
+  // quand la pièce change de taille, chaque élément fixé au mur reste sur son mur
+  function changerDims(k, valeur) {
+    const ancien = { ...etat.dims }; etat.dims[k] = valeur;
+    etat.objets.forEach(o => {
+      const c = CAT[o.type]; if (!c || !(c.pose === "mur" || c.pose === "dansMur")) return;
+      const m = murDe(o.rot), { l, p } = etat.dims;
+      if (m === 1) o.x += (l - ancien.l) / 2; if (m === 3) o.x -= (l - ancien.l) / 2;
+      if (m === 2) o.z += (p - ancien.p) / 2; if (m === 0) o.z -= (p - ancien.p) / 2;
+    });
+    reconstruire();
+  }
   function tournerObjet(i) {
     const o = etat.objets[i], c = CAT[o.type];
     if (c.pose === "mur" || c.pose === "dansMur") { const { l, p } = etat.dims; const k = (murDe(o.rot) + 1) % 4; [o.x, o.z] = [[0, -p / 2], [l / 2, 0], [0, p / 2], [-l / 2, 0]][k]; }
@@ -679,7 +690,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
   });
   panneau.addEventListener("change", e => {
     const t = e.target;
-    if (t.dataset.dim) { etat.dims[t.dataset.dim] = Math.max(1, Math.min(9, (Number(t.value) || 0) / 100)); reconstruire(); return; }
+    if (t.dataset.dim) { changerDims(t.dataset.dim, Math.max(1, Math.min(9, (Number(t.value) || 0) / 100))); return; }
     if (t.dataset.format) etat[t.dataset.format].format = t.value;
     else if (t.dataset.joint) etat[t.dataset.joint].joint = t.value;
     else if (t.id === "faience") etat.faience = t.value;
@@ -874,19 +885,36 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     const v = document.createElement("div"); v.className = "voile";
     const listeAjout = GROUPES.map(gp => `<optgroup label="${gp}">${Object.entries(CAT).filter(([, c]) => c.groupe === gp).map(([k, c]) => `<option value="${k}">${esc(c.nom)}</option>`).join("")}</optgroup>`).join("");
     v.innerHTML = `<div class="fenetre" role="dialog" aria-modal="true" style="max-width:900px"><div class="tete"><h2>Plan 2D</h2><button class="icone" data-fermer aria-label="Fermer">✕</button></div>
+      <div class="trois" id="planPiece" style="margin-bottom:6px">
+        <div class="champ"><label>Pièce : longueur cm</label><input type="number" data-pdim="l" value="${cm(etat.dims.l)}" inputmode="numeric"></div>
+        <div class="champ"><label>Largeur cm</label><input type="number" data-pdim="p" value="${cm(etat.dims.p)}" inputmode="numeric"></div>
+        <div class="champ"><label>Hauteur cm</label><input type="number" data-pdim="h" value="${cm(etat.dims.h)}" inputmode="numeric"></div>
+      </div>
       <div class="actions-doc" style="margin:0 0 10px;align-items:center">
         <select id="planAjout" style="width:auto;flex:1;min-width:180px"><option value="">+ Ajouter un élément…</option>${listeAjout}</select>
         <button class="btn clair" id="planTourner" disabled>Tourner</button>
         <button class="btn danger" id="planRetirer" disabled>Retirer</button>
       </div>
+      <div class="trois" id="planElement" hidden style="margin-bottom:6px"></div>
       <canvas id="planCanvas" style="width:100%;height:auto;border:1px solid var(--sable);border-radius:12px;display:block;touch-action:none;cursor:grab"></canvas>
       <p class="gris" style="font-size:13px;margin:10px 0 14px" id="planAide">Touchez un élément pour le choisir, faites-le glisser pour le déplacer. Traits pleins : au sol · pointillés : en hauteur · EC/EF arrivées d'eau, EV évacuation, PC prise.</p>
       <div class="actions-doc" style="margin:0"><button class="btn" id="planTelecharger">Télécharger le plan</button></div></div>`;
     document.body.appendChild(v);
     const cv = v.querySelector("#planCanvas"), bT = v.querySelector("#planTourner"), bR = v.querySelector("#planRetirer"), aide = v.querySelector("#planAide");
     let choisi = null, repere = null, glisse = null;
+    const zoneEl = v.querySelector("#planElement");
+    const champsElement = () => { // dimensions de l'élément choisi
+      const o = choisi !== null && etat.objets[choisi], c = o && CAT[o.type];
+      if (!c || c.groupe === "Réseaux") { zoneEl.hidden = true; zoneEl.dataset.pour = ""; return; }
+      if (zoneEl.dataset.pour === String(choisi) + o.type) return;
+      zoneEl.dataset.pour = String(choisi) + o.type; zoneEl.hidden = false;
+      zoneEl.innerHTML = `${c.tailles ? `<div class="champ"><label>${esc(COURT[o.type] || c.nom)} : taille</label><select data-ptaille><option value="">Sur mesure</option>${c.tailles.map(([w, d]) => `<option value="${w}x${d}" ${cm(o.w) === w && cm(o.d) === d ? "selected" : ""}>${w} × ${d}</option>`).join("")}</select></div>` : ""}
+        <div class="champ"><label>Largeur cm</label><input type="number" data-pod="w" value="${cm(o.w)}" inputmode="numeric"></div>
+        <div class="champ"><label>${c.pose === "dansMur" ? "Épaisseur" : "Profondeur"} cm</label><input type="number" data-pod="d" value="${cm(o.d)}" inputmode="numeric"></div>`;
+    };
     const redessiner = () => {
       repere = dessinerPlan(cv, choisi);
+      champsElement();
       bT.disabled = bR.disabled = choisi === null;
       if (choisi !== null) aide.textContent = `${CAT[etat.objets[choisi].type].nom} : faites glisser pour déplacer, ou utilisez Tourner / Retirer.`;
     };
@@ -904,6 +932,23 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     });
     const lacher = () => { if (!glisse) return; glisse = null; cv.style.cursor = "grab"; if (etat.objets[choisi]?.type === "douche") construirePiece(); else majMetre(); };
     cv.addEventListener("pointerup", lacher); cv.addEventListener("pointercancel", lacher);
+    // pièce : longueur, largeur, hauteur
+    v.querySelector("#planPiece").addEventListener("change", e => {
+      const k = e.target.dataset.pdim; if (!k) return;
+      const max = k === "h" ? 4 : 9, min = k === "h" ? 2 : 1;
+      changerDims(k, Math.max(min, Math.min(max, (Number(e.target.value) || 0) / 100))); e.target.value = cm(etat.dims[k]);
+      const champ3d = document.querySelector(`#reglages3d [data-dim="${k}"]`); if (champ3d) champ3d.value = cm(etat.dims[k]);
+      redessiner();
+    });
+    // élément : taille courante ou sur mesure
+    zoneEl.addEventListener("change", e => {
+      const o = etat.objets[choisi]; if (!o) return; const t = e.target;
+      if (t.dataset.ptaille !== undefined) { if (!t.value) return; [o.w, o.d] = t.value.split("x").map(x => Number(x) / 100); }
+      else if (t.dataset.pod) o[t.dataset.pod] = Math.max(1, Number(t.value) || 0) / 100;
+      else return;
+      selection = choisi; refaire(); if (o.type === "douche") construirePiece(); afficherSelection();
+      zoneEl.dataset.pour = ""; redessiner();
+    });
     v.querySelector("#planAjout").onchange = e => { if (!e.target.value) return; choisi = ajouterObjet(e.target.value); e.target.value = ""; redessiner(); };
     bT.onclick = () => { if (choisi === null) return; tournerObjet(choisi); redessiner(); };
     bR.onclick = () => { if (choisi === null) return; etat.objets.splice(choisi, 1); choisi = null; selection = null; reconstruire(); aide.textContent = "Élément retiré."; redessiner(); };
