@@ -405,6 +405,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
           <button class="btn clair" id="plan2d">Plan 2D</button>
           <button class="btn discret" id="vueDessus">Vue de dessus</button>
           <button class="btn discret" id="modeChantier">Mode chantier</button>
+          <button class="btn discret" id="aZero">Recommencer à zéro</button>
         </div>
         <div class="carte" id="metre"></div>
       </div>
@@ -525,6 +526,18 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
   // reflets dosés : forts sur le métal et le verre, discrets ailleurs
   function doser() { scene.traverse(m => { const mt = m.material; if (!mt || mt.userData.dose) return; mt.userData.dose = true;
     if (mt.envMapIntensity === 1) mt.envMapIntensity = mt.metalness > .5 ? .9 : mt.roughness < .2 ? .5 : .25; }); }
+  function tournerObjet(i) {
+    const o = etat.objets[i], c = CAT[o.type];
+    if (c.pose === "mur" || c.pose === "dansMur") { const { l, p } = etat.dims; const k = (murDe(o.rot) + 1) % 4; [o.x, o.z] = [[0, -p / 2], [l / 2, 0], [0, p / 2], [-l / 2, 0]][k]; }
+    else o.rot = norm(o.rot + Math.PI / 2);
+    placer(i); if (o.type === "douche") construirePiece(); else majMetre();
+  }
+  function ajouterObjet(t) {
+    const o = { type: t, x: 0, z: 0, rot: 0 }; completer(o);
+    if (CAT[t].pose === "mur" || CAT[t].pose === "dansMur") o.z = -etat.dims.p / 2;
+    etat.objets.push(o); selection = etat.objets.length - 1; reconstruire();
+    return selection;
+  }
   function reconstruire() { construirePiece(); construireObjets(); afficherSelection(); doser(); }
 
   /* --- Rendu --- */
@@ -638,12 +651,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     else if (b.dataset.sel === "fermer") { selection = null; afficherSelection(); }
     else if (b.dataset.sel === "retirer") { etat.objets.splice(selection, 1); selection = null; reconstruire(); }
     else if (b.dataset.sel === "dupliquer") { etat.objets.push({ ...o, x: o.x + .15, z: o.z + .15 }); selection = etat.objets.length - 1; reconstruire(); }
-    else if (b.dataset.sel === "tourner") {
-      const c = CAT[o.type];
-      if (c.pose === "mur" || c.pose === "dansMur") { const { l, p } = etat.dims; const k = (murDe(o.rot) + 1) % 4; [o.x, o.z] = [[0, -p / 2], [l / 2, 0], [0, p / 2], [-l / 2, 0]][k]; }
-      else o.rot = norm(o.rot + Math.PI / 2);
-      placer(selection); if (o.type === "douche") construirePiece(); else majMetre();
-    }
+    else if (b.dataset.sel === "tourner") tournerObjet(selection);
   });
 
   /* --- Réglages de la pièce et des revêtements --- */
@@ -662,9 +670,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
       document.getElementById("nomRobinet").textContent = ROBINETTERIE[etat.robinetterie].nom; return;
     }
     else if (b.dataset.ajout) {
-      const t = b.dataset.ajout, o = { type: t, x: 0, z: 0, rot: 0 }; completer(o);
-      if (CAT[t].pose === "mur" || CAT[t].pose === "dansMur") o.z = -etat.dims.p / 2;
-      etat.objets.push(o); selection = etat.objets.length - 1; reconstruire();
+      const t = b.dataset.ajout; ajouterObjet(t);
       toast(`${CAT[t].nom} ajouté : faites-le glisser`); return;
     } else return;
     b.parentElement.querySelectorAll(".pastille").forEach(x => x.classList.toggle("actif", x === b));
@@ -689,6 +695,19 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     dessus = !dessus;
     if (dessus) { camera.position.set(0, Math.max(etat.dims.l, etat.dims.p) * 2.2, .01); controles.target.set(0, 0, 0); e.target.textContent = "Vue 3D"; }
     else { camera.position.set(2.6, 2.3, 3.2); controles.target.set(0, .9, 0); e.target.textContent = "Vue de dessus"; }
+  };
+  let avantZero = null, minuteurZero = null;
+  document.getElementById("aZero").onclick = e => {
+    const b = e.target;
+    if (avantZero) { // annuler : on remet la pièce comme avant
+      etat.objets = JSON.parse(avantZero); avantZero = null; clearTimeout(minuteurZero);
+      b.textContent = "Recommencer à zéro"; reconstruire(); toast("Pièce remise comme avant ✓"); return;
+    }
+    avantZero = JSON.stringify(etat.objets);
+    etat.objets = []; selection = null; reconstruire();
+    b.textContent = "Annuler (remettre comme avant)";
+    toast("Pièce vide : ajoutez vos éléments");
+    minuteurZero = setTimeout(() => { avantZero = null; b.textContent = "Recommencer à zéro"; }, 15000);
   };
   document.getElementById("modeChantier").onclick = e => { chantier = !chantier; e.target.textContent = chantier ? "Vue finie" : "Mode chantier"; construirePiece(); };
   const image = (largeur = 1400) => {
@@ -740,7 +759,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     double: "Double vasque", vasquePoser: "Vasque à poser", colonne: "Colonne", armoire: "Armoire", meubleHaut: "Meuble haut", etagere: "Étagère", banc: "Banc",
     laveLinge: "Lave-linge", radiateur: "Sèche-serv.", radiateurEau: "Radiateur", miroir: "Miroir", miroirRect: "Miroir" };
   const EN_HAUTEUR = ["armoire", "meubleHaut", "etagere", "miroir", "miroirRect"];
-  function dessinerPlan(cv) {
+  function dessinerPlan(cv, choisi = null) {
     const W = 1600, Hc = 1200; cv.width = W; cv.height = Hc;
     const g = cv.getContext("2d"), { l, p } = etat.dims;
     const marge = 170, ech = Math.min((W - 2 * marge) / l, (Hc - 2 * marge - 90) / p);
@@ -815,6 +834,13 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
         texte(`${Math.round(o.w * 100)} × ${Math.round(o.d * 100)}`, cx, cy + taille * .7, taille * .8, GRIS, 500);
       }
     });
+    // élément choisi : liseré fin
+    const oc = choisi !== null && etat.objets[choisi];
+    if (oc && CAT[oc.type]) {
+      const r = CAT[oc.type].groupe === "Réseaux" || ["porte", "fenetre"].includes(oc.type);
+      if (r) { const [mx, my] = CAT[oc.type].pose === "plafond" ? [X(oc.x), Y(oc.z)] : coin(oc, 0, .07); g.beginPath(); g.arc(mx, my, 30, 0, TAU); g.lineWidth = 3; g.strokeStyle = "#c8141a"; g.stroke(); }
+      else rect(oc, oc.w + .06, oc.d + .06, null, "#c8141a", false);
+    }
     // cotes générales
     g.strokeStyle = ENCRE; g.fillStyle = ENCRE; g.lineWidth = 2;
     const fleche = (x1, y1, x2, y2) => { g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke(); [[x1, y1, x2, y2], [x2, y2, x1, y1]].forEach(([a, b, c2, d]) => { const an = Math.atan2(d - b, c2 - a); g.beginPath(); g.moveTo(a, b); g.lineTo(a + 16 * Math.cos(an + .35), b + 16 * Math.sin(an + .35)); g.lineTo(a + 16 * Math.cos(an - .35), b + 16 * Math.sin(an - .35)); g.closePath(); g.fill(); }); };
@@ -827,18 +853,64 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     g.fillText(`KA Rénovation · ${etat.nom}${client ? " · " + nomClient(client) : ""}`, marge, yb);
     g.font = "500 22px Inter, Arial, sans-serif"; g.fillStyle = GRIS;
     g.fillText(`Surface ${String(Math.round(l * p * 100) / 100).replace(".", ",")} m² · hauteur ${Math.round(etat.dims.h * 100)} cm · ${new Date().toLocaleDateString("fr-FR")} · cotes en cm, plan indicatif`, marge, yb + 34);
+    return { versPiece: (px, py) => [(px - ox) / ech - l / 2, (py - oy) / ech - p / 2], ech };
+  }
+  // élément sous le doigt, en mètres dans la pièce (les éléments en hauteur passent après ceux au sol)
+  function objetSous(x, z) {
+    let trouve = null, meilleur = Infinity;
+    etat.objets.forEach((o, i) => {
+      const c = CAT[o.type]; if (!c) return;
+      const dx = x - o.x, dz = z - o.z, ponctuel = c.groupe === "Réseaux" || ["porte", "fenetre"].includes(o.type);
+      if (ponctuel) { const d = Math.hypot(dx, dz); if (d < Math.max(.25, (o.w || 0) / 2) && d < meilleur) { meilleur = d; trouve = i; } return; }
+      const cs = Math.cos(o.rot), sn = Math.sin(o.rot), u = dx * cs - dz * sn, v = dx * sn + dz * cs;
+      if (Math.abs(u) <= o.w / 2 + .04 && Math.abs(v) <= o.d / 2 + .04) {
+        const score = (EN_HAUTEUR.includes(o.type) ? 1 : 0) + Math.hypot(u, v) / 10;
+        if (score < meilleur) { meilleur = score; trouve = i; }
+      }
+    });
+    return trouve;
   }
   document.getElementById("plan2d").onclick = () => {
     const v = document.createElement("div"); v.className = "voile";
+    const listeAjout = GROUPES.map(gp => `<optgroup label="${gp}">${Object.entries(CAT).filter(([, c]) => c.groupe === gp).map(([k, c]) => `<option value="${k}">${esc(c.nom)}</option>`).join("")}</optgroup>`).join("");
     v.innerHTML = `<div class="fenetre" role="dialog" aria-modal="true" style="max-width:900px"><div class="tete"><h2>Plan 2D</h2><button class="icone" data-fermer aria-label="Fermer">✕</button></div>
-      <canvas id="planCanvas" style="width:100%;height:auto;border:1px solid var(--sable);border-radius:12px;display:block"></canvas>
-      <p class="gris" style="font-size:13px;margin:10px 0 14px">Traits pleins : au sol · pointillés : fixé au mur en hauteur (miroir, meuble haut…) · EC/EF arrivées d'eau, EV évacuation, PC prise.</p>
+      <div class="actions-doc" style="margin:0 0 10px;align-items:center">
+        <select id="planAjout" style="width:auto;flex:1;min-width:180px"><option value="">+ Ajouter un élément…</option>${listeAjout}</select>
+        <button class="btn clair" id="planTourner" disabled>Tourner</button>
+        <button class="btn danger" id="planRetirer" disabled>Retirer</button>
+      </div>
+      <canvas id="planCanvas" style="width:100%;height:auto;border:1px solid var(--sable);border-radius:12px;display:block;touch-action:none;cursor:grab"></canvas>
+      <p class="gris" style="font-size:13px;margin:10px 0 14px" id="planAide">Touchez un élément pour le choisir, faites-le glisser pour le déplacer. Traits pleins : au sol · pointillés : en hauteur · EC/EF arrivées d'eau, EV évacuation, PC prise.</p>
       <div class="actions-doc" style="margin:0"><button class="btn" id="planTelecharger">Télécharger le plan</button></div></div>`;
     document.body.appendChild(v);
-    const cv = v.querySelector("#planCanvas"); dessinerPlan(cv);
+    const cv = v.querySelector("#planCanvas"), bT = v.querySelector("#planTourner"), bR = v.querySelector("#planRetirer"), aide = v.querySelector("#planAide");
+    let choisi = null, repere = null, glisse = null;
+    const redessiner = () => {
+      repere = dessinerPlan(cv, choisi);
+      bT.disabled = bR.disabled = choisi === null;
+      if (choisi !== null) aide.textContent = `${CAT[etat.objets[choisi].type].nom} : faites glisser pour déplacer, ou utilisez Tourner / Retirer.`;
+    };
+    redessiner();
+    const pointPiece = e => { const r = cv.getBoundingClientRect(); return repere.versPiece((e.clientX - r.left) * cv.width / r.width, (e.clientY - r.top) * cv.height / r.height); };
+    cv.addEventListener("pointerdown", e => {
+      const [x, z] = pointPiece(e); choisi = objetSous(x, z);
+      if (choisi !== null) { const o = etat.objets[choisi]; glisse = { dx: x - o.x, dz: z - o.z }; cv.setPointerCapture(e.pointerId); cv.style.cursor = "grabbing"; }
+      selection = choisi; afficherSelection(); redessiner();
+    });
+    cv.addEventListener("pointermove", e => {
+      if (!glisse || choisi === null) return;
+      const [x, z] = pointPiece(e), o = etat.objets[choisi];
+      o.x = x - glisse.dx; o.z = z - glisse.dz; placer(choisi); redessiner();
+    });
+    const lacher = () => { if (!glisse) return; glisse = null; cv.style.cursor = "grab"; if (etat.objets[choisi]?.type === "douche") construirePiece(); else majMetre(); };
+    cv.addEventListener("pointerup", lacher); cv.addEventListener("pointercancel", lacher);
+    v.querySelector("#planAjout").onchange = e => { if (!e.target.value) return; choisi = ajouterObjet(e.target.value); e.target.value = ""; redessiner(); };
+    bT.onclick = () => { if (choisi === null) return; tournerObjet(choisi); redessiner(); };
+    bR.onclick = () => { if (choisi === null) return; etat.objets.splice(choisi, 1); choisi = null; selection = null; reconstruire(); aide.textContent = "Élément retiré."; redessiner(); };
     v.addEventListener("click", e => { if (e.target === v || e.target.closest("[data-fermer]")) v.remove(); });
     v.querySelector("#planTelecharger").onclick = async () => {
-      const blob = await new Promise(ok => cv.toBlob(ok, "image/png"));
+      dessinerPlan(cv, null); // le plan envoyé ne montre pas l'élément choisi
+      const blob = await new Promise(ok => cv.toBlob(ok, "image/png")); redessiner();
       const fichier = new File([blob], `plan-${(client?.nom || "salle-de-bain").toLowerCase()}.png`, { type: "image/png" });
       if (navigator.canShare && navigator.canShare({ files: [fichier] })) { try { await navigator.share({ files: [fichier] }); return; } catch (er) { if (er.name === "AbortError") return; } }
       const a = document.createElement("a"); a.href = URL.createObjectURL(fichier); a.download = fichier.name; a.click();
