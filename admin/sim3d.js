@@ -594,7 +594,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     }
     g.position.set(o.x, c.pose === "plafond" ? h - .01 : (o.y || 0), o.z);
     g.rotation.y = o.rot;
-    g.userData.mur = c.pose === "dansMur" ? murDe(o.rot) : -1;
+    g.userData.mur = c.pose === "dansMur" || (c.pose === "mur" && !surDecroche) ? murDe(o.rot) : -1;
     if (o.type === "douche") { // la paroi va du côté ouvert de la douche
       // un côté est « libre » s'il ne touche ni un mur ni un décroché (coffrage)
       const contreDecroche = (x, z) => etat.objets.some(d2 => d2.type === "decroche" && Math.abs(x - d2.x) < (encombrement(d2)[0] + .08) && Math.abs(z - d2.z) < (encombrement(d2)[1] + .08));
@@ -1076,7 +1076,10 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     const c = CAT[o.type], { l, p } = etat.dims, tx = (o.x + l / 2) / l, tz = (o.z + p / 2) / p;
     const long = t => t < .34 ? "à gauche" : t > .66 ? "à droite" : "au milieu", prof = t => t < .34 ? "côté fond" : t > .66 ? "côté devant" : "au milieu";
     if (c.pose === "mur" && etat.objets.some(d2 => d2.type === "decroche" && Math.hypot(o.x - d2.x, o.z - d2.z) < Math.max(d2.w, d2.d) / 2 + o.d / 2 + .1)) return "contre le coffrage (gaine technique)";
-    if (c.pose === "mur" || c.pose === "dansMur") { const k = murDe(o.rot); return `${NOMS_MURS[k]}, ${k === 0 || k === 2 ? long(tx) : prof(tz)}`; }
+    if (c.pose === "mur" || c.pose === "dansMur") {
+      const k = murDe(o.rot), derriere = (k === 2 && camera.position.z > 0) || (k === 0 && camera.position.z < 0);
+      return `${NOMS_MURS[k]}, ${k === 0 || k === 2 ? long(tx) : prof(tz)}${derriere ? " (derrière le photographe : hors du cadre, ne pas le montrer)" : ""}`;
+    }
     const [ex, ez] = encombrement(o), marge = .12;
     const murs = [o.z - ez < -p / 2 + marge && "fond", o.x + ex > l / 2 - marge && "droite", o.z + ez > p / 2 - marge && "devant", o.x - ex < -l / 2 + marge && "gauche"].filter(Boolean);
     if (murs.length >= 2) return `dans l'angle ${murs.slice(0, 2).join("-")}`;
@@ -1100,6 +1103,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     const photo = source === "photo";
     // murs visibles selon l'angle de la 3D au moment où l'on prépare le texte
     const cote = camera.position.x > 0 ? "gauche" : "droite", face = camera.position.z > 0 ? "du fond" : "de devant";
+    const coinCam = `${camera.position.z > 0 ? "devant" : "fond"}-${camera.position.x > 0 ? "droite" : "gauche"}`, coinVu = `${camera.position.z > 0 ? "fond" : "devant"}-${camera.position.x > 0 ? "gauche" : "droite"}`;
     return [
       photo
         ? "Rénovation de salle de bain : à partir de la photo jointe (la pièce actuelle de mon client), crée la photo de cette même pièce une fois rénovée."
@@ -1107,7 +1111,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
       "",
       "STYLE PHOTO",
       "- Photographie d'architecture d'intérieur professionnelle, qualité magazine de décoration.",
-      "- Objectif grand-angle 24 mm, appareil à hauteur d'œil (1,50 m), lignes verticales bien droites, aucune déformation, plafond visible.",
+      photo ? "- Même cadrage que la photo jointe, appareil à hauteur d'œil, lignes verticales bien droites, aucune déformation." : "- Objectif grand-angle 24 mm, lignes verticales bien droites, aucune déformation.",
       "- Lumière naturelle douce et diffuse, ombres légères, miroir lumineux allumé, balance des blancs neutre.",
       "- Rendu 100 % photoréaliste : vraies matières (céramique, verre, bois, métal), reflets justes, joints de carrelage nets et réguliers, légère profondeur de champ. Aucun aspect 3D, dessin ou image de synthèse.",
       `- Format : ${FORMATS_IMG[format] || FORMATS_IMG.image}.`,
@@ -1115,8 +1119,9 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
       "À RESPECTER STRICTEMENT",
       photo
         ? "- Même point de vue que la photo : mêmes murs, même fenêtre, même porte, mêmes proportions."
-        : `- Ne reprends pas le point de vue de l'image 3D (maquette vue de haut, en coupe, sans plafond) ni son aspect. Photographie la pièce comme une vraie pièce fermée, avec ses murs et son plafond, depuis l'entrée, debout, face au mur ${face}, le mur de ${cote} visible sur le côté.`,
-      photo ? null : "- Chaque élément reste exactement à sa place et sur son mur, comme sur l'image 3D : ne déplace rien, n'ajoute aucun meuble, n'en retire aucun.",
+        : `- POINT DE VUE : exactement le même angle que l'image 3D. Vue de trois quarts, en diagonale, depuis l'angle ${coinCam} de la pièce, en regardant vers l'angle ${coinVu}. Ne prends PAS la pièce de face. Garde le même cadrage et les mêmes éléments dans le champ ; la seule différence est que la pièce est vraie, fermée, avec son plafond.`,
+      photo ? null : "- Chaque élément reste exactement à sa place et sur son mur, comme sur l'image 3D : ne déplace rien.",
+      photo ? null : "- N'ajoute RIEN qui n'est pas sur l'image 3D : pas de porte, pas de fenêtre, pas de mur ou de cloison en plus, pas de niche, pas de radiateur, pas de meuble, pas de miroir en plus. Les murs coupés de la maquette ne doivent pas apparaître.",
       `- Pièce de ${metres(l)} × ${metres(p)}, hauteur ${metres(h)}.`,
       `- Carrelage mural ${faience} : ${revetement(etat.murs)}.`,
       etat.accent.actif ? `- Mur de la douche : ${revetement(etat.accent)}.` : null,
