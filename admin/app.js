@@ -3,6 +3,7 @@ import * as db from "./store.js";
 import { UNITES } from "./donnees.js";
 import { telechargerPDF, totaux, eur } from "./pdf.js";
 import { CATEGORIES, etatPaiements } from "./carnet.js";
+import { carteRdv, lierRdv } from "./agenda.js";
 
 const vue = document.getElementById("vue");
 const nav = document.getElementById("nav");
@@ -81,7 +82,7 @@ function confirmer(message, oui = "Confirmer") {
 
 /* =================== Accueil =================== */
 async function vueAccueil() {
-  const [docs, clients, demandes, depenses] = await Promise.all([db.lister("documents"), db.lister("clients"), listerDemandes(), db.listerDepenses(["depense", "paiement", "avancement"]).catch(() => [])]);
+  const [docs, clients, demandes, depenses] = await Promise.all([db.lister("documents"), db.lister("clients"), listerDemandes(), db.listerDepenses(["depense", "paiement", "avancement", "rdv"]).catch(() => [])]);
   const montants = depenses.splice(0); depenses.push(...montants.filter(x => (x.type || "depense") === "depense"));
   const nouvelles = (demandes || []).filter(x => x.statut === "nouvelle");
   const relances = docs.filter(aRelancer);
@@ -98,6 +99,7 @@ async function vueAccueil() {
       <div class="stat"><span class="petit">Encaissé ce mois</span><b>${eur(somme(encaisse))} €</b></div>
       <div class="stat"><span class="petit">Clients</span><b>${clients.length}</b></div>
     </div>
+    ${blocRdv(montants, clients)}
     ${blocChantiers(docs, clients, depenses, montants)}
     ${blocDepenses(depenses, clients, mois)}
     ${nouvelles.length ? `<a class="alerte" href="#/demandes">${ICO.boite}<span><b>${nouvelles.length} nouvelle${nouvelles.length > 1 ? "s" : ""} demande${nouvelles.length > 1 ? "s" : ""} de devis</b><small>${esc(nouvelles.slice(0, 3).map(x => x.nom).join(", "))}</small></span><span>›</span></a>` : ""}
@@ -120,6 +122,17 @@ async function vueAccueil() {
     try { await db.enregistrer("documents", { ...d }); } catch (er) { erreur(er); } // repart pour 7 jours
     b.closest(".ligne-liste").remove(); toast("Relance envoyée ✓");
   };
+}
+
+// Rendez-vous des deux semaines à venir, avec l'agenda du téléphone et le rappel au client en un toucher
+function blocRdv(montants, clients) {
+  const maintenant = Date.now() - 3600000, horizon = Date.now() + 14 * 864e5;
+  const rdvs = montants.filter(x => x.type === "rdv" && new Date(x.created_at) >= maintenant && new Date(x.created_at) <= horizon)
+    .sort((a, b) => a.created_at < b.created_at ? -1 : 1);
+  const clientDe = r => clients.find(c => c.id === r.client_id);
+  setTimeout(() => { const z = document.getElementById("rdvs"); if (z) lierRdv(z, rdvs, clientDe, envoyerMessage); });
+  return `<div class="carte" style="margin-bottom:22px" id="rdvs"><h2 style="margin-bottom:6px">Rendez-vous à venir</h2>
+    ${rdvs.length ? rdvs.map(r => carteRdv(r, esc, { client: clientDe(r) })).join("") : '<p class="gris" style="font-size:14px">Aucun rendez-vous dans les deux semaines. On les note dans le carnet du client (+ Rendez-vous).</p>'}</div>`;
 }
 
 // Chantiers en cours : un devis signé dont le PV n'est pas encore signé ; un toucher ouvre la fiche du client (carnet)
@@ -320,7 +333,7 @@ async function vueDocument(id, type, params) {
     majTotal();
     lier();
     const cd = document.getElementById("carnetDoc");
-    if (cd) import("./carnet.js").then(m => m.monterCarnet(cd, { db, client: { ...(d.client || {}), id: d.client_id }, P, toast, esc, erreur })).catch(erreur);
+    if (cd) import("./carnet.js").then(m => m.monterCarnet(cd, { db, client: { ...(d.client || {}), id: d.client_id }, P, toast, esc, erreur, envoyerMessage })).catch(erreur);
   };
 
   const dessinerLots = () => {
@@ -632,7 +645,7 @@ async function vueClient(id, params) {
     } catch { /* l'objet du devis reste affiché */ }
   });
   if (c.id) import("./carnet.js").then(async m => {
-    await m.monterCarnet(document.getElementById("carnet"), { db, client: c, P, toast, esc, erreur });
+    await m.monterCarnet(document.getElementById("carnet"), { db, client: c, P, toast, esc, erreur, envoyerMessage });
     if (params?.get("carnet")) document.getElementById("carnet").closest("details")?.scrollIntoView({ block: "start" });
   }).catch(erreur);
   document.getElementById("fc").onsubmit = async e => {

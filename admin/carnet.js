@@ -1,6 +1,8 @@
 // Carnet de chantier : photos, notes, choses à faire, imprévus et dépenses, datés et rangés par étape
 // (avant, pendant, après les travaux) ; image « avant / après » pour les réseaux.
 
+import { OBJETS_RDV, carteRdv, lierRdv } from "./agenda.js";
+
 const ETAPES = { avant: "Avant", pendant: "Pendant", apres: "Après" };
 const TYPES = {
   note: { nom: "Note", bouton: "+ Note", aide: "Arrivée d'eau déplacée de 20 cm vers la gauche" },
@@ -8,7 +10,8 @@ const TYPES = {
   imprevu: { nom: "Imprévu", bouton: "+ Imprévu", aide: "Tuyau en plomb derrière le carrelage, à remplacer" },
   depense: { nom: "Dépense", bouton: "+ Dépense", aide: "Colle et joints chez le fournisseur" },
   heures: { nom: "Heures", bouton: "+ Heures", aide: "Détail (facultatif) : pose du carrelage mural" },
-  paiement: { nom: "Paiement reçu", bouton: "+ Paiement reçu", aide: "Détail (facultatif) : acompte par virement" }
+  paiement: { nom: "Paiement reçu", bouton: "+ Paiement reçu", aide: "Détail (facultatif) : acompte par virement" },
+  rdv: { nom: "Rendez-vous", bouton: "+ Rendez-vous", aide: "Précision (facultatif) : apporter les échantillons" }
 };
 export const CATEGORIES = { fournitures: "Fournitures et consommables", carburant: "Carburant", peage: "Péage et parking", location: "Location de matériel",
   decharge: "Déchetterie", outillage: "Outillage", vehicule: "Véhicule (entretien)", assurance: "Assurances", telephone: "Téléphone et internet",
@@ -58,7 +61,7 @@ async function partagerFichier(blob, nom) {
   const a = document.createElement("a"); a.href = URL.createObjectURL(f); a.download = f.name; a.click();
 }
 
-export async function monterCarnet(el, { db, client, P = {}, toast, esc, erreur }) {
+export async function monterCarnet(el, { db, client, P = {}, toast, esc, erreur, envoyerMessage }) {
   let devisSignes = 0, acompte = Number(P.acompte_pct) || 30;
   try {
     const signes = (await db.lister("documents")).filter(d => d.client_id === client.id && d.type === "devis" && d.statut === "signe");
@@ -87,6 +90,7 @@ export async function monterCarnet(el, { db, client, P = {}, toast, esc, erreur 
       const fin = l.fait ? new Date(new Date(l.created_at).getTime() + (Number(l.montant) || 0) * 3.6e6).toISOString() : null;
       return `<div class="note-carnet heures"><small>Heures · ${esc(ETAPES[l.etape])}</small><p><b>${l.fait ? duree(l.montant) : "en cours"}</b> · ${heure(l.created_at)} → ${fin ? heure(fin) : "…"}${l.texte && l.texte !== "Pointage" ? " · " + esc(l.texte) : ""}</p>${croix}</div>`;
     }
+    if (l.type === "rdv") return carteRdv(l, esc, { retirer: true });
     if (l.type === "paiement") return `<div class="note-carnet paiement"><small>Paiement reçu · ${new Date(l.created_at).toLocaleDateString("fr-FR")}</small><p><b>${eur(l.montant)} €</b>${l.texte ? " · " + esc(l.texte) : ""}</p>${croix}</div>`;
     if (l.type === "avancement") { const a = AVANCEMENTS(acompte).find(x => x[2] === Number(l.montant)); return `<div class="note-carnet"><small>Avancement · ${heure(l.created_at)}</small><p>${esc(a ? a[1] : "Avancement")} : ${Number(l.montant)} % du devis dû</p>${croix}</div>`; }
     if (l.type === "depense") return `<div class="note-carnet depense">${tete}<p><b>${eur(l.montant)} €</b> · ${esc(CATEGORIES[l.categorie] || "Dépense")}${l.texte ? " · " + esc(l.texte) : ""}</p>${urls[l.id] ? `<button type="button" class="lien-ticket" data-voir="${l.id}">Voir le ticket</button>` : ""}${croix}</div>`;
@@ -121,6 +125,9 @@ export async function monterCarnet(el, { db, client, P = {}, toast, esc, erreur 
           ${saisie === "depense" ? `<div class="champ"><label for="cCategorie">Catégorie</label><select id="cCategorie">${Object.entries(CATEGORIES).map(([k, n]) => `<option value="${k}">${n}</option>`).join("")}</select></div>
             <div class="deux"><div class="champ"><label for="cMontant">Montant €</label><input type="number" id="cMontant" step="0.01" min="0" inputmode="decimal"></div>
             <div class="champ"><label>Ticket (facultatif)</label><label class="btn discret petit-btn" style="display:inline-flex">${"Photo du ticket"}<input type="file" id="cTicket" accept="image/*" hidden></label></div></div>` : ""}
+          ${saisie === "rdv" ? (() => { const d = new Date(); d.setDate(d.getDate() + 1); return `<div class="champ"><label for="cRdvObjet">Rendez-vous</label><select id="cRdvObjet">${OBJETS_RDV.map(o => `<option>${o}</option>`).join("")}</select></div>
+            <div class="deux"><div class="champ"><label for="cRdvDate">Date</label><input type="date" id="cRdvDate" value="${d.toISOString().slice(0, 10)}"></div>
+            <div class="champ"><label for="cRdvHeure">Heure</label><input type="time" id="cRdvHeure" value="09:00"></div></div>`; })() : ""}
           ${saisie === "paiement" ? `<div class="champ"><label for="cMontant">Montant reçu €</label><input type="number" id="cMontant" step="0.01" min="0" inputmode="decimal"></div>` : ""}
           ${saisie === "heures" ? `<div class="deux"><div class="champ"><label for="cHeures">Nombre d'heures</label><input type="number" id="cHeures" step="0.25" min="0" inputmode="decimal" placeholder="7,5"></div>
             <div class="champ"><label for="cDebut">Début</label><input type="time" id="cDebut" value="08:00"></div></div>` : ""}
@@ -219,6 +226,7 @@ export async function monterCarnet(el, { db, client, P = {}, toast, esc, erreur 
     el.querySelectorAll("[data-voir]").forEach(b => b.onclick = () => voir(b.dataset.voir));
     el.querySelectorAll("[data-retirer]").forEach(b => b.onclick = () => retirer(b.dataset.retirer));
     el.querySelectorAll("[data-saisie]").forEach(b => b.onclick = () => { saisie = b.dataset.saisie || null; ticket = null; dessiner(); el.querySelector("#cTexte")?.focus(); });
+    if (envoyerMessage) lierRdv(el, lignes, () => client, envoyerMessage);
     el.querySelectorAll("[data-avancement]").forEach(b => b.onclick = async () => {
       try { const n = await db.ajouterCarnet({ client_id: client.id, etape, type: "avancement", montant: Number(b.dataset.avancement) }); lignes.unshift(n); toast("Avancement noté ✓"); dessiner(); } catch (e) { erreur(e); }
     });
@@ -241,6 +249,16 @@ export async function monterCarnet(el, { db, client, P = {}, toast, esc, erreur 
     const ok = el.querySelector("#cOk");
     if (ok) ok.onclick = async () => {
       const texte = el.querySelector("#cTexte").value.trim(), montant = Number(el.querySelector("#cMontant")?.value || 0);
+      if (saisie === "rdv") {
+        const quand = new Date(`${el.querySelector("#cRdvDate").value}T${el.querySelector("#cRdvHeure").value || "09:00"}`);
+        if (isNaN(quand)) return toast("Indiquez la date et l'heure.");
+        const objet = el.querySelector("#cRdvObjet").value;
+        try {
+          const n = await db.ajouterCarnet({ client_id: client.id, etape, type: "rdv", texte: texte ? `${objet} · ${texte}` : objet, created_at: quand.toISOString() });
+          lignes.unshift(n); lignes.sort((a, b) => a.created_at < b.created_at ? 1 : -1); toast("Rendez-vous noté ✓"); saisie = null; dessiner();
+        } catch (e) { erreur(e); }
+        return;
+      }
       if (saisie === "heures") {
         const nb = Number(el.querySelector("#cHeures").value || 0); if (!nb) return toast("Indiquez le nombre d'heures.");
         const [hh, mm] = (el.querySelector("#cDebut").value || "08:00").split(":").map(Number), debut = new Date(); debut.setHours(hh, mm, 0, 0);

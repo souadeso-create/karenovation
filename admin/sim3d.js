@@ -233,6 +233,18 @@ const CAT = {
       if (hf > 0) { const b = new THREE.Mesh(new THREE.BoxGeometry(w, hf, d), [face(d, hf), face(d, hf), peint, peint, face(w, hf), face(w, hf)]); b.position.y = hf / 2; b.castShadow = b.receiveShadow = true; g.add(b); }
       if (hf < h) { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h - hf, d), peint); b.position.y = hf + (h - hf) / 2; b.castShadow = b.receiveShadow = true; g.add(b); }
       return g; } },
+  cloison: { nom: "Cloison placo", groupe: "Structure", pose: "sol", dims: [200, 7, 250], tailles: [[100, 7], [150, 7], [200, 7], [250, 7], [300, 10]],
+    options: { travaux: ["À créer (placo)", "Existante"] },
+    faire(w, d, h, o) { return CAT.decroche.faire(w, d, h, o); } }, // dessinée comme un mur : carrelée ou peinte
+  demolition: { nom: "Mur à démolir", groupe: "Structure", pose: "sol", dims: [200, 10, 250], tailles: [[100, 10], [200, 10], [300, 10], [200, 20]],
+    faire(w, d) { // en transparent, avec ses arêtes : ce mur disparaîtra
+      const g = new THREE.Group(), h = AMBIANCE.h;
+      const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ color: 0x8a8580, transparent: true, opacity: .22, depthWrite: false }));
+      b.position.y = h / 2; g.add(b);
+      const a = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(w, h, d)), new THREE.LineBasicMaterial({ color: 0x1b1a18 }));
+      a.position.y = h / 2; g.add(a);
+      const croix = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-w / 2, 0, d / 2 + .002), new THREE.Vector3(w / 2, h, d / 2 + .002), new THREE.Vector3(w / 2, 0, d / 2 + .002), new THREE.Vector3(-w / 2, h, d / 2 + .002)]);
+      g.add(new THREE.LineSegments(croix, new THREE.LineBasicMaterial({ color: 0x1b1a18 }))); return g; } },
   douche: { nom: "Douche à l'italienne", groupe: "Sanitaires", pose: "sol", dims: [120, 90, 200], tailles: [[90, 90], [120, 80], [120, 90], [140, 90], [160, 90]], options: { receveur: ["Noir", "Blanc", "Carrelé"] },
     faire(w, d, h, o) {
       const g = new THREE.Group();
@@ -327,7 +339,7 @@ const CAT = {
       g.add(pose(new THREE.PointLight(0xfff1d6, .5, 1.5), 0, r, .2)); return g; } },
   miroirRect: { nom: "Miroir rectangulaire", groupe: "Équipements", pose: "mur", dims: [100, 3, 70], tailles: [[80, 3], [100, 3], [120, 3], [140, 3]], hauteur: 115,
     faire(w, d, h) { const g = new THREE.Group(); g.add(pose(new THREE.Mesh(new THREE.PlaneGeometry(w, h), MAT.miroir), 0, h / 2, .005)); g.add(pose(boite(w, .015, .02, MAT.led), 0, h + .01, 0)); return g; } },
-  porte: { nom: "Porte", groupe: "Ouvertures", pose: "dansMur", dims: [83, 4, 204], tailles: [[73, 4], [83, 4], [93, 4]], options: { ouverture: ["Battante", "Coulissante"] },
+  porte: { nom: "Porte", groupe: "Ouvertures", pose: "dansMur", dims: [83, 4, 204], tailles: [[73, 4], [83, 4], [93, 4]], options: { travaux: ["Existante", "Nouvelle (à poser)"], ouverture: ["Battante", "Coulissante"] },
     faire(w, d, h, o) { const g = new THREE.Group(), cadre = MAT.blanc, coul = o.ouverture === "Coulissante";
       g.add(pose(boite(.05, h + .05, .04, cadre), -w / 2 - .025, (h + .05) / 2, .01)); g.add(pose(boite(.05, h + .05, .04, cadre), w / 2 + .025, (h + .05) / 2, .01));
       g.add(pose(boite(w + .1, .05, .04, cadre), 0, h + .025, .01));
@@ -335,7 +347,7 @@ const CAT = {
       g.add(pose(boite(.02, .02, .08, MAT.noir), (coul ? w * .25 : 0) + w / 2 - .08, 1.02, .05));
       return g; } },
   fenetre: { nom: "Fenêtre", groupe: "Ouvertures", pose: "dansMur", dims: [60, 4, 75], tailles: [[45, 4], [60, 4], [80, 4], [100, 4]], hauteur: 120,
-    options: { modele: ["Battante", "Oscillo-battante", "Fixe", "Pavés de verre"] },
+    options: { travaux: ["Existante", "Nouvelle (à poser)"], modele: ["Battante", "Oscillo-battante", "Fixe", "Pavés de verre"] },
     faire(w, d, h, o) { const g = new THREE.Group(), m = o?.modele || "Battante";
       if (m === "Pavés de verre") { // briques de verre de 19 cm
         const n = Math.max(1, Math.round(w / .19)), r = Math.max(1, Math.round(h / .19)), pw = w / n, ph = h / r;
@@ -477,10 +489,8 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
           <button class="btn clair" id="validerClient">Faire valider les choix au client</button>
         </div>
         <p class="gris" id="etatValidation" style="font-size:13px;margin:-8px 0 14px"></p>
-        <div class="carte" id="metre"></div>
-      </div>
-      <div class="carte" id="reglages3d">
-        <fieldset><legend>Pièce (cm)</legend>
+        <details class="carte section-piece" id="piece3d" style="margin-bottom:12px"><summary>Pièce (cm)<span>${cm(etat.dims.l)} × ${cm(etat.dims.p)} × ${cm(etat.dims.h)}</span></summary>
+          <div style="margin-top:10px">
           <div class="trois">
             <div class="champ"><label>Longueur</label><input type="number" data-dim="l" value="${cm(etat.dims.l)}" min="100" max="900" inputmode="numeric"></div>
             <div class="champ"><label>Largeur</label><input type="number" data-dim="p" value="${cm(etat.dims.p)}" min="100" max="900" inputmode="numeric"></div>
@@ -494,7 +504,11 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
             <div class="champ"><label>Faux plafond</label><select id="fauxPlafond"><option value="0" ${!etat.fauxPlafond ? "selected" : ""}>Non</option><option value="1" ${etat.fauxPlafond ? "selected" : ""}>Oui, plaques hydrofuges</option></select></div>
             <div class="champ"><label>Dépose de l'existant</label><select id="depose"><option value="1" ${etat.depose ? "selected" : ""}>Oui</option><option value="0" ${!etat.depose ? "selected" : ""}>Non</option></select></div>
           </div>
-        </fieldset>
+          </div>
+        </details>
+        <div class="carte" id="metre"></div>
+      </div>
+      <div class="carte" id="reglages3d">
         <details class="groupe-ajout deroule-couleur"><summary>Peinture des murs<span><i class="mini" id="miniPeinture" style="background:${etat.peinture}"></i><b id="nomPeinture">${esc(PEINTURES[etat.peinture] || "")}</b></span></summary>
           <p class="gris" style="font-size:13px;margin-bottom:8px">Visible au-dessus de la faïence et sur les murs non carrelés.</p>
           <div class="palette">${Object.entries(PEINTURES).map(([c, n]) => `<button type="button" class="pastille ${c === etat.peinture ? "actif" : ""}" data-peinture="${c}" title="${n}" aria-label="${n}" style="background:${c}"></button>`).join("")}</div>
@@ -569,12 +583,13 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
   // Coffrages (décrochés) : longueur des faces visibles et des faces collées à un mur
   function coffrages() {
     const { l, p } = etat.dims;
-    return etat.objets.filter(o => o.type === "decroche").map(o => {
+    return etat.objets.filter(o => o.type === "decroche" || o.type === "cloison").map(o => {
       const travers = murDe(o.rot) % 2 === 1, [ex, ez] = travers ? [o.d, o.w] : [o.w, o.d];
       const x0 = o.x - ex / 2, x1 = o.x + ex / 2, z0 = o.z - ez / 2, z1 = o.z + ez / 2;
       const faces = [[ex, z0 + p / 2], [ez, l / 2 - x1], [ex, p / 2 - z1], [ez, x0 + l / 2]];
       const visible = faces.filter(([, e]) => e > .05).reduce((a, [w]) => a + w, 0);
       const cache = faces.filter(([, e]) => e <= .05).reduce((a, [w]) => a + w, 0);
+      if (o.type === "cloison") return { creer: o.travaux === "À créer (placo)", cloison: true, longueur: o.w, visible, cache, angles: 0 };
       return { creer: o.travaux === "À créer (coffrage)", visible, cache, angles: Math.max(0, faces.filter(([, e]) => e > .05).length - 1) };
     });
   }
@@ -604,7 +619,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     });
     plafonnier.position.set(0, h - .1, 0);
     construirePente();
-    if (meubles.children.length) etat.objets.forEach((o, i) => { if (o.type === "decroche") { selection === i ? (refaireIndex(i)) : refaireIndex(i); } });
+    if (meubles.children.length) etat.objets.forEach((o, i) => { if (o.type === "decroche" || o.type === "cloison") { selection === i ? (refaireIndex(i)) : refaireIndex(i); } });
     majMetre(); doser();
   }
   // pente : depuis le mur choisi, de la hauteur basse jusqu'à la pleine hauteur sur la largeur donnée
@@ -646,7 +661,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     if (c.pose === "mur") {
       const mur = Math.min(o.z + p / 2, l / 2 - o.x, p / 2 - o.z, o.x + l / 2);
       etat.objets.forEach(d2 => {
-        if (d2.type !== "decroche" || d2 === o) return;
+        if ((d2.type !== "decroche" && d2.type !== "cloison") || d2 === o) return;
         const [dx, dz] = encombrement(d2), demi = Math.max(o.w, o.d) / 2;
         [[0, d2.z + dz, 0, "z"], [Math.PI, d2.z - dz, 0, "z"], [Math.PI / 2, d2.x + dx, 0, "x"], [-Math.PI / 2, d2.x - dx, 0, "x"]].forEach(([rot, plan, , axe]) => {
           const ecart = axe === "z" ? Math.abs(o.z - plan) : Math.abs(o.x - plan), long = axe === "z" ? Math.abs(o.x - d2.x) <= dx : Math.abs(o.z - d2.z) <= dz;
@@ -671,7 +686,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     g.userData.mur = c.pose === "dansMur" || (c.pose === "mur" && !surDecroche) ? murDe(o.rot) : -1;
     if (o.type === "douche") { // la paroi va du côté ouvert de la douche
       // un côté est « libre » s'il ne touche ni un mur ni un décroché (coffrage)
-      const contreDecroche = (x, z) => etat.objets.some(d2 => d2.type === "decroche" && Math.abs(x - d2.x) < (encombrement(d2)[0] + .08) && Math.abs(z - d2.z) < (encombrement(d2)[1] + .08));
+      const contreDecroche = (x, z) => etat.objets.some(d2 => (d2.type === "decroche" || d2.type === "cloison") && Math.abs(x - d2.x) < (encombrement(d2)[0] + .08) && Math.abs(z - d2.z) < (encombrement(d2)[1] + .08));
       const cs = Math.cos(o.rot), sn = Math.sin(o.rot), libre = (a, b) => { const x = o.x + cs * a + sn * b, z = o.z - sn * a + cs * b; return Math.min(l / 2 - Math.abs(x), p / 2 - Math.abs(z)) > .08 && !contreDecroche(x, z); };
       const cote = libre(o.w / 2, 0) && !libre(-o.w / 2, 0) ? "droite" : libre(-o.w / 2, 0) && !libre(o.w / 2, 0) ? "gauche" : libre(o.w / 2, 0) ? "droite" : "devant";
       o.paroi = cote; g.children.forEach(ch => { if (ch.userData.paroi) ch.visible = ch.userData.paroi === cote; });
@@ -836,12 +851,14 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     const cof = coffrages().filter(c => c.creer), dev = cof.reduce((a, c) => a + c.visible, 0);
     const surfCof = dev * h, surfFP = etat.fauxPlafond ? l * p : 0, placo = surfCof + surfFP;
     if (dev > .05) {
-      ajoute("Rails R48 (coffrage)", `${pl(Math.ceil(2 * dev * 1.1 / 3), "barre")} de 3 m`, `sol + plafond, ${n(2 * dev)} m`);
-      const mont = cof.reduce((a, c) => a + Math.ceil(c.visible / .6) + 1, 0) * Math.ceil(h / 3);
-      ajoute("Montants M48 (coffrage)", `${pl(mont, "barre")} de 3 m`, "un tous les 60 cm");
+      const rails = cof.reduce((a, c) => a + 2 * (c.cloison ? c.longueur : c.visible), 0);
+      ajoute("Rails R48", `${pl(Math.ceil(rails * 1.1 / 3), "barre")} de 3 m`, `sol + plafond, ${n(rails)} m`);
+      const mont = cof.reduce((a, c) => a + Math.ceil((c.cloison ? c.longueur : c.visible) / .6) + 1, 0) * Math.ceil(h / 3);
+      ajoute("Montants M48", `${pl(mont, "barre")} de 3 m`, "un tous les 60 cm");
       const ang = cof.reduce((a, c) => a + c.angles, 0);
       if (ang) ajoute("Cornières d'angle", `${pl(ang * Math.ceil(h / 3), "barre")} de 3 m`, "angles saillants du coffrage");
-      ajoute("Laine minérale 45 mm", `${n(surfCof)} m²`, "isolation phonique des gaines");
+      const laine = cof.reduce((a, c) => a + (c.cloison ? c.longueur : c.visible) * h, 0);
+      ajoute("Laine minérale 45 mm", `${n(laine)} m²`, "isolation phonique");
     }
     if (surfFP) {
       const rangs = Math.ceil(p / .6) + 1, ml = rangs * l;
@@ -867,6 +884,13 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
       if (m15) ajoute("Fil 1,5 mm² (H07V-U)", `${m15 * 3} m`, "phase, neutre, terre ; éclairage et VMC");
       ajoute("Gaine ICTA Ø 20", `${m25 + m15} m`, "");
       ajoute("Connecteurs rapides (type Wago)", pl(points * 3, "connecteur"), "");
+    }
+    // démolition : sacs à gravats (≈ 35 L) et bâche de protection
+    const demol = etat.objets.filter(o => o.type === "demolition");
+    if (demol.length) {
+      const vol = demol.reduce((a, o) => a + o.w * o.d * h, 0);
+      ajoute("Sacs à gravats", `${Math.ceil(vol * 1.4 / .035)} sacs`, `≈ ${n(vol)} m³ de mur, foisonnement compris`);
+      ajoute("Bâche de protection", "1 rouleau", "sol et passages");
     }
     ajoute("Silicone sanitaire", pl(douche ? 2 : 1, "cartouche"), "joints autour des sanitaires");
     return liste;
@@ -1010,9 +1034,12 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     panneau.querySelectorAll("[data-format]").forEach(s => { s.value = etat[s.dataset.format].format; });
     construirePiece();
   });
-  panneau.addEventListener("change", e => {
+  const surReglage = e => {
     const t = e.target;
-    if (t.dataset.dim) { changerDims(t.dataset.dim, Math.max(1, Math.min(9, (Number(t.value) || 0) / 100))); return; }
+    if (t.dataset.dim) {
+      changerDims(t.dataset.dim, Math.max(1, Math.min(9, (Number(t.value) || 0) / 100)));
+      const r = document.querySelector("#piece3d summary span"); if (r) r.textContent = `${cm(etat.dims.l)} × ${cm(etat.dims.p)} × ${cm(etat.dims.h)}`; return;
+    }
     if (t.dataset.format) etat[t.dataset.format].format = t.value;
     else if (t.dataset.joint) etat[t.dataset.joint].joint = t.value;
     else if (t.id === "faience") etat.faience = t.value;
@@ -1020,12 +1047,14 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     else if (t.id === "fauxPlafond") { etat.fauxPlafond = t.value === "1"; majMetre(); return; }
     else if (t.id === "accentActif") etat.accent.actif = t.checked;
     else if (t.id === "penteMur" || t.id === "penteBasse" || t.id === "penteLarg") {
-      etat.pente = { mur: panneau.querySelector("#penteMur").value, basse: Math.max(.5, (Number(panneau.querySelector("#penteBasse").value) || 100) / 100),
-        largeur: Math.max(.3, (Number(panneau.querySelector("#penteLarg").value) || 120) / 100) };
+      etat.pente = { mur: document.getElementById("penteMur").value, basse: Math.max(.5, (Number(document.getElementById("penteBasse").value) || 100) / 100),
+        largeur: Math.max(.3, (Number(document.getElementById("penteLarg").value) || 120) / 100) };
     }
     else return;
     construirePiece();
-  });
+  };
+  panneau.addEventListener("change", surReglage);
+  document.getElementById("piece3d").addEventListener("change", surReglage);
 
   /* --- Barre d'actions --- */
   let dessus = false;
@@ -1157,9 +1186,14 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
         if (sym[0]) texte(sym[0], (c.pose === "plafond" ? cx : mx), (c.pose === "plafond" ? cy : my) + 30, 18, sym[1], 700);
         return;
       }
-      if (o.type === "decroche") { // dessiné comme un morceau de mur
+      if (o.type === "decroche" || o.type === "cloison") { // dessiné comme un morceau de mur
         rect(o, o.w, o.d, ENCRE, ENCRE, false);
-        const [tx, ty] = coin(o, 0, o.d / 2 + .16); texte(`Décroché ${Math.round(o.w * 100)} × ${Math.round(o.d * 100)}`, tx, ty, 18, GRIS, 600);
+        const [tx, ty] = coin(o, 0, o.d / 2 + .16); texte(`${o.type === "cloison" ? "Cloison" : "Décroché"} ${Math.round(o.w * 100)} × ${Math.round(o.d * 100)}`, tx, ty, 18, GRIS, 600);
+        return;
+      }
+      if (o.type === "demolition") { // mur qui disparaît : en pointillés
+        rect(o, o.w, o.d, null, ENCRE, true);
+        const [tx, ty] = coin(o, 0, o.d / 2 + .16); texte(`À démolir ${Math.round(o.w * 100)} cm`, tx, ty, 18, GRIS, 600);
         return;
       }
       const haut = EN_HAUTEUR.includes(o.type);
@@ -1281,7 +1315,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
       const k = e.target.dataset.pdim; if (!k) return;
       const max = k === "h" ? 4 : 9, min = k === "h" ? 2 : 1;
       changerDims(k, Math.max(min, Math.min(max, (Number(e.target.value) || 0) / 100))); e.target.value = cm(etat.dims[k]);
-      const champ3d = document.querySelector(`#reglages3d [data-dim="${k}"]`); if (champ3d) champ3d.value = cm(etat.dims[k]);
+      const champ3d = document.querySelector(`#piece3d [data-dim="${k}"]`); if (champ3d) champ3d.value = cm(etat.dims[k]);
       redessiner();
     });
     // élément : taille courante ou sur mesure
@@ -1314,7 +1348,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
   function emplacement(o) {
     const c = CAT[o.type], { l, p } = etat.dims, tx = (o.x + l / 2) / l, tz = (o.z + p / 2) / p;
     const long = t => t < .34 ? "à gauche" : t > .66 ? "à droite" : "au milieu", prof = t => t < .34 ? "côté fond" : t > .66 ? "côté devant" : "au milieu";
-    if (c.pose === "mur" && etat.objets.some(d2 => d2.type === "decroche" && Math.hypot(o.x - d2.x, o.z - d2.z) < Math.max(d2.w, d2.d) / 2 + o.d / 2 + .1)) return "contre le coffrage (gaine technique)";
+    if (c.pose === "mur" && etat.objets.some(d2 => (d2.type === "decroche" || d2.type === "cloison") && Math.hypot(o.x - d2.x, o.z - d2.z) < Math.max(d2.w, d2.d) / 2 + o.d / 2 + .1)) return "contre le coffrage (gaine technique)";
     if (c.pose === "mur" || c.pose === "dansMur") {
       const k = murDe(o.rot), derriere = (k === 2 && camera.position.z > 0) || (k === 0 && camera.position.z < 0);
       return `${NOMS_MURS[k]}, ${k === 0 || k === 2 ? long(tx) : prof(tz)}${derriere ? " (derrière le photographe : hors du cadre, ne pas le montrer)" : ""}`;
@@ -1327,14 +1361,14 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
   }
   function descriptionIA(source, format = "image") {
     const { l, p, h } = etat.dims;
-    const equipements = etat.objets.filter(o => CAT[o.type].groupe !== "Réseaux").map(o => {
+    const equipements = etat.objets.filter(o => CAT[o.type].groupe !== "Réseaux" && o.type !== "demolition").map(o => {
       const c = CAT[o.type], w = o.w ?? c.dims[0] / 100, d = o.d ?? c.dims[1] / 100;
       const opts = Object.keys(c.options || {}).filter(k => k !== "travaux").map(k => k === "finition" ? (BOIS[o[k]] || "").toLowerCase()
         : o[k] === "Comme la robinetterie" ? (ROBINETTERIE[etat.robinetterie]?.nom || "").toLowerCase()
         : o[k] ? (k === "receveur" ? "receveur " : "") + o[k].toLowerCase() : "").filter(Boolean);
       const taille = c.tailles && ["Sanitaires", "Meubles"].includes(c.groupe) ? ` (${Math.round(w * 100)} × ${Math.round(d * 100)} cm)` : "";
       const paroi = o.type === "douche" ? ", paroi vitrée fixe avec profilé noir" : o.type === "wc" ? ", plaque de chasse d'eau noire"
-        : o.type === "decroche" ? ", du sol au plafond, habillé comme les murs" : "";
+        : o.type === "decroche" ? ", du sol au plafond, habillé comme les murs" : o.type === "cloison" ? ", cloison du sol au plafond, habillée comme les murs" : "";
       return `- ${c.nom}${taille}${opts.length ? ", " + opts.join(", ") : ""}${paroi}${source === "photo" ? "" : " : " + emplacement(o)}`;
     });
     const faience = { plafond: "jusqu'au plafond", "120": "à 1,20 m de haut (jusqu'au plafond dans la douche)", douche: "seulement dans la douche" }[etat.faience];
@@ -1440,7 +1474,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     l.push({ titre: "Robinetterie et poignées", valeur: rob?.nom || "", couleur: rob?.couleur });
     // tous les éléments ajoutés, les identiques regroupés (« × 2 »)
     const vus = new Map();
-    etat.objets.forEach(o => {
+    etat.objets.filter(o => !/^Exist/.test(o.travaux || "")).forEach(o => {
       const c = CAT[o.type], grand = ["Sanitaires", "Meubles"].includes(c.groupe);
       const opts = Object.keys(c.options || {}).filter(k => k !== "finition").map(k => k === "receveur" ? "receveur " + String(o[k]).toLowerCase() : o[k]).filter(Boolean);
       const valeur = [grand || c.groupe === "Ouvertures" ? `${cm(o.w)} × ${cm(c.groupe === "Ouvertures" ? o.h : o.d)} cm` : "", o.finition ? BOIS[o.finition] : "", ...opts].filter(Boolean).join(", ");
@@ -1508,7 +1542,7 @@ KA Rénovation — 07 63 14 76 27`;
       const m = metre(), arr = n => Math.round(n * 10) / 10;
       if (etat.depose) ajoute("Dépose complète salle de bain", "Dépose & évacuation", 1);
       const comptes = {};
-      etat.objets.forEach(o => { if (POUR_DEVIS[o.type]) comptes[o.type] = (comptes[o.type] || 0) + 1; });
+      etat.objets.forEach(o => { if (POUR_DEVIS[o.type] && !/^Exist/.test(o.travaux || "")) comptes[o.type] = (comptes[o.type] || 0) + 1; });
       const deja = new Set();
       for (const [t, n] of Object.entries(comptes)) {
         const [mot, cat] = POUR_DEVIS[t];
@@ -1519,7 +1553,11 @@ KA Rénovation — 07 63 14 76 27`;
       ajoute("Ragréage", "Placo / Étanchéité / Sol", arr(m.sol), "m2");
       const cof = coffrages().filter(c => c.creer), dev = cof.reduce((a, c) => a + c.visible, 0);
       if (dev > .05 || etat.fauxPlafond) ajoute("Placo BA13 hydro", "Placo / Étanchéité / Sol", 1, "presta",
-        [dev > .05 ? `Création de coffrage : ${arr(dev).toLocaleString("fr-FR")} m développés, du sol au plafond` : "", etat.fauxPlafond ? `Faux plafond : ${arr(m.plafond).toLocaleString("fr-FR")} m²` : ""].filter(Boolean).join(" ; "));
+        [cof.some(c => !c.cloison) ? `Création de coffrage : ${arr(cof.filter(c => !c.cloison).reduce((a, c) => a + c.visible, 0)).toLocaleString("fr-FR")} m développés, du sol au plafond` : "",
+         cof.some(c => c.cloison) ? `Création de cloison : ${arr(cof.filter(c => c.cloison).reduce((a, c) => a + c.longueur, 0)).toLocaleString("fr-FR")} m, du sol au plafond` : "",
+         etat.fauxPlafond ? `Faux plafond : ${arr(m.plafond).toLocaleString("fr-FR")} m²` : ""].filter(Boolean).join(" ; "));
+      const dem = etat.objets.filter(o => o.type === "demolition");
+      if (dem.length) ajoute("Démolition de cloison", "Dépose & évacuation", arr(dem.reduce((a, o) => a + o.w, 0)), "ml", "Démolition, évacuation des gravats en déchetterie");
       const f = etat.sol.format;
       if (f === "parquet") ajoute("Pose de parquet", "Sols", arr(m.sol), "m2");
       else if (f !== "uni") ajoute(["120x120", "60x120", "80x80"].includes(f) ? "Pose sol grand format" : "Pose carrelage au sol", "Pose carrelage", arr(m.sol), "m2");
