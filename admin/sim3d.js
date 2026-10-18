@@ -710,11 +710,35 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     const peint = 2 * (l + p) * h - murm2 - etat.objets.filter(o => o.type === "porte").reduce((a, o) => a + o.w * o.h, 0);
     return { sol: l * p, murs: Math.max(0, murm2), peinture: Math.max(0, peint), plafond: l * p };
   }
+  // Carrelage à commander : surface posée + chutes (10 %, 15 % en pose décalée ou grand format), et nombre de carreaux.
+  function carrelageACommander() {
+    const m = metre(), { h } = etat.dims, hf = hauteurFaience(h), lignes = [];
+    const douche = etat.objets.find(o => o.type === "douche");
+    const zoneAccent = etat.accent.actif ? Object.values(zonesDouche()).reduce((a, [x, y]) => a + (y - x) * h, 0) : 0;
+    const sol = m.sol - (douche && douche.receveur !== "Carrelé" ? douche.w * douche.d : 0);
+    const calcule = (titre, rev, surf) => {
+      if (surf <= .01) return;
+      const f = FORMATS[rev.format], [a, b] = f.t, grand = Math.max(a, b) >= .8;
+      const chute = f.sansJoint ? 0 : f.decale || grand ? .15 : .10, total = surf * (1 + chute);
+      const plaque = rev.format === "5x5"; // la mosaïque se vend en plaques de 30 × 30
+      const n = f.sansJoint ? 0 : Math.ceil(total / (plaque ? .09 : a * b));
+      lignes.push({ titre, matiere: MATIERES[rev.matiere]?.nom || "", format: f.nom, surf, chute, total, n, unite: plaque ? "plaques 30×30" : rev.format === "parquet" ? "lames" : "carreaux" });
+    };
+    calcule("Sol", etat.sol, Math.max(0, sol));
+    calcule("Murs", etat.murs, Math.max(0, m.murs - zoneAccent));
+    if (etat.accent.actif) calcule("Murs de la douche", etat.accent, zoneAccent);
+    return lignes;
+  }
   function majMetre() {
     const m = metre(), f = n => n.toLocaleString("fr-FR", { maximumFractionDigits: 1 });
     const bloc = (v, t) => `<div><b style="font-family:var(--serif);font-size:20px;font-weight:400">${f(v)} m²</b><br><span class="gris" style="font-size:13px">${t}</span></div>`;
     document.getElementById("metre").innerHTML = `<div class="petit" style="margin-bottom:8px">Métré</div>
-      <div class="deux" style="gap:12px">${bloc(m.sol, `sol · ${FORMATS[etat.sol.format].nom}`)}${bloc(m.murs, "faïence murale")}${bloc(m.peinture, "peinture murs")}${bloc(m.plafond, "plafond")}</div>`;
+      <div class="deux" style="gap:12px">${bloc(m.sol, `sol · ${FORMATS[etat.sol.format].nom}`)}${bloc(m.murs, "faïence murale")}${bloc(m.peinture, "peinture murs")}${bloc(m.plafond, "plafond")}</div>
+      <div class="petit" style="margin:18px 0 8px">Carrelage à commander</div>
+      ${carrelageACommander().map(c => `<div style="display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--sable)">
+        <div><b style="font-weight:600">${c.titre}</b><br><span class="gris" style="font-size:13px">${esc(c.matiere)} · ${esc(c.format)}<br>${f(c.surf)} m² posés + ${Math.round(c.chute * 100)} % de chutes</span></div>
+        <div style="text-align:right;white-space:nowrap"><b style="font-family:var(--serif);font-size:20px;font-weight:400">${f(Math.ceil(c.total * 10) / 10)} m²</b>${c.n ? `<br><span class="gris" style="font-size:13px">≈ ${c.n.toLocaleString("fr-FR")} ${c.unite}</span>` : ""}</div></div>`).join("")}
+      <p class="gris" style="font-size:12px;margin-top:6px">Arrondissez au nombre de boîtes du fournisseur.</p>`;
   }
 
   /* --- Sélection, déplacement au doigt --- */
