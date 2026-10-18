@@ -567,10 +567,28 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
   function placer(i) {
     const o = etat.objets[i], c = CAT[o.type], g = objetsMesh.get(i); if (!g) return;
     const { l, p, h } = etat.dims, auMur = c.pose === "mur" || c.pose === "dansMur";
-    if (auMur) collerAuMur(o);
+    // un élément « au mur » peut aussi s'accrocher à une face de décroché (WC devant un coffrage…)
+    let surDecroche = false;
+    if (c.pose === "mur") {
+      const mur = Math.min(o.z + p / 2, l / 2 - o.x, p / 2 - o.z, o.x + l / 2);
+      etat.objets.forEach(d2 => {
+        if (d2.type !== "decroche" || d2 === o) return;
+        const [dx, dz] = encombrement(d2), demi = Math.max(o.w, o.d) / 2;
+        [[0, d2.z + dz, 0, "z"], [Math.PI, d2.z - dz, 0, "z"], [Math.PI / 2, d2.x + dx, 0, "x"], [-Math.PI / 2, d2.x - dx, 0, "x"]].forEach(([rot, plan, , axe]) => {
+          const ecart = axe === "z" ? Math.abs(o.z - plan) : Math.abs(o.x - plan), long = axe === "z" ? Math.abs(o.x - d2.x) <= dx : Math.abs(o.z - d2.z) <= dz;
+          if (long && ecart < Math.min(mur, .6) && !surDecroche) {
+            surDecroche = true; o.rot = rot;
+            if (axe === "z") { o.z = plan + Math.sign(Math.cos(rot)) * o.d / 2; o.x = Math.min(d2.x + dx - o.w / 2, Math.max(d2.x - dx + o.w / 2, o.x)); }
+            else { o.x = plan + Math.sign(Math.sin(rot)) * o.d / 2; o.z = Math.min(d2.z + dz - o.w / 2, Math.max(d2.z - dz + o.w / 2, o.z)); }
+            void demi;
+          }
+        });
+      });
+    }
+    if (auMur && !surDecroche) collerAuMur(o);
     const [ex, ez] = encombrement(o);
     o.x = Math.min(l / 2 - ex, Math.max(-l / 2 + ex, o.x)); o.z = Math.min(p / 2 - ez, Math.max(-p / 2 + ez, o.z));
-    if (auMur) {
+    if (auMur && !surDecroche) {
       const k = murDe(o.rot), prof = c.pose === "dansMur" ? 0 : o.d / 2;
       if (k === 0) o.z = -p / 2 + prof; if (k === 2) o.z = p / 2 - prof; if (k === 1) o.x = l / 2 - prof; if (k === 3) o.x = -l / 2 + prof;
     }
@@ -578,7 +596,9 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     g.rotation.y = o.rot;
     g.userData.mur = c.pose === "dansMur" ? murDe(o.rot) : -1;
     if (o.type === "douche") { // la paroi va du côté ouvert de la douche
-      const cs = Math.cos(o.rot), sn = Math.sin(o.rot), libre = (a, b) => { const x = o.x + cs * a + sn * b, z = o.z - sn * a + cs * b; return Math.min(l / 2 - Math.abs(x), p / 2 - Math.abs(z)) > .08; };
+      // un côté est « libre » s'il ne touche ni un mur ni un décroché (coffrage)
+      const contreDecroche = (x, z) => etat.objets.some(d2 => d2.type === "decroche" && Math.abs(x - d2.x) < (encombrement(d2)[0] + .08) && Math.abs(z - d2.z) < (encombrement(d2)[1] + .08));
+      const cs = Math.cos(o.rot), sn = Math.sin(o.rot), libre = (a, b) => { const x = o.x + cs * a + sn * b, z = o.z - sn * a + cs * b; return Math.min(l / 2 - Math.abs(x), p / 2 - Math.abs(z)) > .08 && !contreDecroche(x, z); };
       const cote = libre(o.w / 2, 0) && !libre(-o.w / 2, 0) ? "droite" : libre(-o.w / 2, 0) && !libre(o.w / 2, 0) ? "gauche" : libre(o.w / 2, 0) ? "droite" : "devant";
       o.paroi = cote; g.children.forEach(ch => { if (ch.userData.paroi) ch.visible = ch.userData.paroi === cote; });
     }
@@ -1055,6 +1075,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
   function emplacement(o) {
     const c = CAT[o.type], { l, p } = etat.dims, tx = (o.x + l / 2) / l, tz = (o.z + p / 2) / p;
     const long = t => t < .34 ? "à gauche" : t > .66 ? "à droite" : "au milieu", prof = t => t < .34 ? "côté fond" : t > .66 ? "côté devant" : "au milieu";
+    if (c.pose === "mur" && etat.objets.some(d2 => d2.type === "decroche" && Math.hypot(o.x - d2.x, o.z - d2.z) < Math.max(d2.w, d2.d) / 2 + o.d / 2 + .1)) return "contre le coffrage (gaine technique)";
     if (c.pose === "mur" || c.pose === "dansMur") { const k = murDe(o.rot); return `${NOMS_MURS[k]}, ${k === 0 || k === 2 ? long(tx) : prof(tz)}`; }
     const [ex, ez] = encombrement(o), marge = .12;
     const murs = [o.z - ez < -p / 2 + marge && "fond", o.x + ex > l / 2 - marge && "droite", o.z + ez > p / 2 - marge && "devant", o.x - ex < -l / 2 + marge && "gauche"].filter(Boolean);
@@ -1077,6 +1098,8 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     const faience = { plafond: "jusqu'au plafond", "120": "à 1,20 m de haut (jusqu'au plafond dans la douche)", douche: "seulement dans la douche" }[etat.faience];
     const FORMATS_IMG = { image: "le même cadrage que l'image jointe", vertical: "vertical 9:16 (pour les réseaux sociaux)", paysage: "horizontal 3:2" };
     const photo = source === "photo";
+    // murs visibles selon l'angle de la 3D au moment où l'on prépare le texte
+    const cote = camera.position.x > 0 ? "gauche" : "droite", face = camera.position.z > 0 ? "du fond" : "de devant";
     return [
       photo
         ? "Rénovation de salle de bain : à partir de la photo jointe (la pièce actuelle de mon client), crée la photo de cette même pièce une fois rénovée."
@@ -1092,7 +1115,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
       "À RESPECTER STRICTEMENT",
       photo
         ? "- Même point de vue que la photo : mêmes murs, même fenêtre, même porte, mêmes proportions."
-        : "- Ne reprends pas le point de vue de l'image 3D (maquette vue de haut, en coupe, sans plafond) ni son aspect. Photographie la pièce comme une vraie pièce fermée, avec ses murs et son plafond, depuis l'entrée, debout, face au mur du fond, le mur de gauche visible sur le côté.",
+        : `- Ne reprends pas le point de vue de l'image 3D (maquette vue de haut, en coupe, sans plafond) ni son aspect. Photographie la pièce comme une vraie pièce fermée, avec ses murs et son plafond, depuis l'entrée, debout, face au mur ${face}, le mur de ${cote} visible sur le côté.`,
       photo ? null : "- Chaque élément reste exactement à sa place et sur son mur, comme sur l'image 3D : ne déplace rien, n'ajoute aucun meuble, n'en retire aucun.",
       `- Pièce de ${metres(l)} × ${metres(p)}, hauteur ${metres(h)}.`,
       `- Carrelage mural ${faience} : ${revetement(etat.murs)}.`,
@@ -1102,7 +1125,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
       `- Robinetterie et poignées : ${(ROBINETTERIE[etat.robinetterie]?.nom || "").toLowerCase()}. Les autres éléments gardent leur couleur indiquée ci-dessous.`,
       etat.pente && etat.pente.mur !== "aucun" ? `- Plafond sous pente (combles) côté mur ${etat.pente.mur === "fond" ? "du fond" : etat.pente.mur === "devant" ? "de devant" : "de " + etat.pente.mur} : ${Math.round(etat.pente.basse * 100)} cm de haut contre ce mur, pleine hauteur à ${Math.round(etat.pente.largeur * 100)} cm.` : null,
       "",
-      photo ? "ÉQUIPEMENTS" : "ÉQUIPEMENTS ET LEUR PLACE (le mur du fond et le mur de gauche sont ceux visibles sur l'image)",
+      photo ? "ÉQUIPEMENTS" : `ÉQUIPEMENTS ET LEUR PLACE (le mur ${face} et le mur de ${cote} sont ceux visibles sur l'image)`,
       ...equipements,
       "",
       "À ÉVITER",
