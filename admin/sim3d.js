@@ -1103,7 +1103,11 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     const photo = source === "photo";
     // murs visibles selon l'angle de la 3D au moment où l'on prépare le texte
     const cote = camera.position.x > 0 ? "gauche" : "droite", face = camera.position.z > 0 ? "du fond" : "de devant";
-    const coinCam = `${camera.position.z > 0 ? "devant" : "fond"}-${camera.position.x > 0 ? "droite" : "gauche"}`, coinVu = `${camera.position.z > 0 ? "fond" : "devant"}-${camera.position.x > 0 ? "gauche" : "droite"}`;
+    // angle de la 3D au moment où l'on prépare le texte : de face ou de trois quarts
+    const cx = camera.position.x - controles.target.x, cz = camera.position.z - controles.target.z;
+    const vue = Math.abs(cx) < Math.abs(cz) * .35 ? `de face, face au mur ${cz > 0 ? "du fond" : "de devant"}`
+      : Math.abs(cz) < Math.abs(cx) * .35 ? `de face, face au mur de ${cx > 0 ? "gauche" : "droite"}`
+      : `de trois quarts, en diagonale, depuis l'angle ${cz > 0 ? "devant" : "fond"}-${cx > 0 ? "droite" : "gauche"} de la pièce vers l'angle ${cz > 0 ? "fond" : "devant"}-${cx > 0 ? "gauche" : "droite"}`;
     return [
       photo
         ? "Rénovation de salle de bain : à partir de la photo jointe (la pièce actuelle de mon client), crée la photo de cette même pièce une fois rénovée."
@@ -1119,7 +1123,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
       "À RESPECTER STRICTEMENT",
       photo
         ? "- Même point de vue que la photo : mêmes murs, même fenêtre, même porte, mêmes proportions."
-        : `- POINT DE VUE : exactement le même angle que l'image 3D. Vue de trois quarts, en diagonale, depuis l'angle ${coinCam} de la pièce, en regardant vers l'angle ${coinVu}. Ne prends PAS la pièce de face. Garde le même cadrage et les mêmes éléments dans le champ ; la seule différence est que la pièce est vraie, fermée, avec son plafond.`,
+        : `- POINT DE VUE : reprends EXACTEMENT l'angle et le cadrage de l'image 3D jointe (ici, vue ${vue}). Ne change pas d'angle, ne recadre pas, garde les mêmes éléments dans le champ ; la seule différence est que la pièce est vraie, fermée, avec son plafond.`,
       photo ? null : "- Chaque élément reste exactement à sa place et sur son mur, comme sur l'image 3D : ne déplace rien.",
       photo ? null : "- N'ajoute RIEN qui n'est pas sur l'image 3D : pas de porte, pas de fenêtre, pas de mur ou de cloison en plus, pas de niche, pas de radiateur, pas de meuble, pas de miroir en plus. Les murs coupés de la maquette ne doivent pas apparaître.",
       `- Pièce de ${metres(l)} × ${metres(p)}, hauteur ${metres(h)}.`,
