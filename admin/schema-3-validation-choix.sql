@@ -18,6 +18,7 @@ $$;
 -- Validation : une seule fois (l'artisan la remet à zéro s'il renvoie la simulation après un changement)
 create or replace function valider_choix(j uuid, nom text) returns json
 language plpgsql security definer set search_path = public as $$
+#variable_conflict use_variable
 declare n text;
 begin
   if char_length(coalesce(trim(nom), '')) < 2 then raise exception 'Nom obligatoire'; end if;
