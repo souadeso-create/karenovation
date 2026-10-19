@@ -441,18 +441,8 @@ async function vueDocument(id, type, params) {
     };
     const su = document.getElementById("suppr");
     if (su) su.onclick = async () => {
-      // Les factures faites depuis ce devis y restent reliées : on les supprime si elles sont en brouillon, sinon on les détache.
-      const lies = estDevis ? (await db.lister("documents")).filter(x => x.devis_id === d.id) : [];
-      const brouillons = lies.filter(x => x.statut === "brouillon"), gardees = lies.filter(x => x.statut !== "brouillon");
-      let msg = `Supprimer définitivement ${d.numero} ?`;
-      if (brouillons.length) msg += ` La facture en brouillon faite depuis ce devis (${brouillons.map(x => x.numero).join(", ")}) sera supprimée aussi.`;
-      if (gardees.length) msg += ` La facture ${gardees.map(x => x.numero).join(", ")} est conservée : elle ne sera simplement plus reliée au devis.`;
-      if (!(await confirmer(msg, "Supprimer"))) return;
-      try {
-        for (const x of brouillons) await db.supprimer("documents", x.id);
-        for (const x of gardees) await db.enregistrer("documents", { ...x, devis_id: null });
-        await db.supprimer("documents", d.id); toast("Supprimé"); location.hash = `#/documents/${d.type}`;
-      } catch (e) { erreur(e); }
+      if (!(await confirmer(`Supprimer définitivement ${d.numero} ?`, "Supprimer"))) return;
+      try { await db.supprimer("documents", d.id); toast("Supprimé"); location.hash = `#/documents/${d.type}`; } catch (e) { erreur(e); }
     };
   };
 
