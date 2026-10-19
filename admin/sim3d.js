@@ -535,6 +535,7 @@ function meuble(w, d, h, n, o) {
   if (o.style === "Sur pieds") [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => g.add(pose(cyl(.012, bas - .02, MAT.robinet), sx * (w / 2 - .04), (bas - .02) / 2, sz * (d / 2 - .04))));
   return g;
 }
+const DOUCHES = ["douche", "receveur", "doucheCabine", "doucheAngle"], estDouche = t => DOUCHES.includes(t);
 const GROUPES = ["Structure", "Sanitaires", "Meubles", "Équipements", "Ouvertures", "Réseaux"];
 // revêtements des murs en cours, pour habiller les décrochés comme les murs
 const AMBIANCE = { murs: null, peinture: "#f3f1ec", faience: "plafond", h: 2.5 };
@@ -719,7 +720,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
   // Zone de douche sur chaque mur qu'elle touche (les deux murs si elle est dans un angle) :
   // { indice du mur: [début, fin] } en mètres, le long du mur, dans le repère du mur.
   function zonesDouche() {
-    const o = etat.objets.find(x => x.type === "douche"); if (!o) return {};
+    const o = etat.objets.find(x => estDouche(x.type)); if (!o) return {};
     const { l, p } = etat.dims, travers = murDe(o.rot) % 2 === 1;
     const [ex, ez] = travers ? [o.d, o.w] : [o.w, o.d];
     const x0 = o.x - ex / 2, x1 = o.x + ex / 2, z0 = o.z - ez / 2, z1 = o.z + ez / 2;
@@ -864,7 +865,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     const o = etat.objets[i], c = CAT[o.type];
     if (c.pose === "mur" || c.pose === "dansMur") { const { l, p } = etat.dims; const k = (murDe(o.rot) + 1) % 4; [o.x, o.z] = [[0, -p / 2], [l / 2, 0], [0, p / 2], [-l / 2, 0]][k]; }
     else o.rot = norm(o.rot + Math.PI / 2);
-    placer(i); if (o.type === "douche") construirePiece(); else majMetre();
+    placer(i); if (estDouche(o.type)) construirePiece(); else majMetre();
   }
   function ajouterObjet(t) {
     const o = { type: t, x: 0, z: 0, rot: 0 }; completer(o);
@@ -959,9 +960,10 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
   // Carrelage à commander : surface posée + chutes (10 %, 15 % en pose décalée ou grand format), et nombre de carreaux.
   function carrelageACommander() {
     const m = metre(), { h } = etat.dims, hf = hauteurFaience(h), lignes = [];
-    const douche = etat.objets.find(o => o.type === "douche");
+    const receveurs = etat.objets.filter(o => estDouche(o.type) && o.receveur !== "Carrelé")
+      .reduce((a, o) => a + o.w * o.d * (o.type === "doucheAngle" ? Math.PI / 4 : 1), 0);
     const zoneAccent = etat.accent.actif ? Object.values(zonesDouche()).reduce((a, [x, y]) => a + (y - x) * h, 0) : 0;
-    const sol = m.sol - (douche && douche.receveur !== "Carrelé" ? douche.w * douche.d : 0);
+    const sol = m.sol - receveurs;
     const calcule = (titre, rev, surf) => {
       if (surf <= .01) return;
       const f = FORMATS[rev.format], [a, b] = f.t, grand = Math.max(a, b) >= .8;
@@ -998,12 +1000,12 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     const sol = l * p;
     ajoute("Primaire d'accrochage", `${pl(Math.max(1, Math.ceil(sol * .15 / 5)), "bidon")} de 5 L`, `≈ ${n(sol * .15)} L pour le sol`);
     ajoute("Ragréage autolissant", `${pl(sacs(sol * 4.5, 25), "sac")} de 25 kg`, "3 mm d'épaisseur");
-    if (etat.sol.format === "parquet") ajoute("Sous-couche parquet", `${Math.ceil(sol * 1.05)} m²`, "");
+    if (etat.sol.format === "parquet") ajoute("Sous-couche sol PVC", `${Math.ceil(sol * 1.05)} m²`, "");
     // douche : étanchéité au sol de la douche et sur ses murs jusqu'à 2 m, bande dans les angles
-    const douche = etat.objets.find(o => o.type === "douche");
+    const douche = etat.objets.find(o => estDouche(o.type));
     if (douche) {
       const lgZones = Object.values(zones).reduce((a, [x, y]) => a + (y - x), 0);
-      const spec = douche.w * douche.d + lgZones * 2;
+      const spec = douche.w * douche.d * (douche.type === "doucheAngle" ? Math.PI / 4 : 1) + lgZones * 2;
       ajoute("Kit d'étanchéité (SPEC)", `${n(spec)} m²`, "sol de la douche + murs sur 2 m");
       ajoute("Bande d'angle d'étanchéité", `${Math.ceil((lgZones + Object.keys(zones).length * 2) * 1.1)} m`, "jonctions sol / murs et angles");
     }
@@ -1062,7 +1064,11 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
       ajoute("Sacs à gravats", `${Math.ceil(vol * 1.4 / .035)} sacs`, `≈ ${n(vol)} m³ de mur, foisonnement compris`);
       ajoute("Bâche de protection", "1 rouleau", "sol et passages");
     }
-    ajoute("Silicone sanitaire", pl(douche ? 2 : 1, "cartouche"), "joints autour des sanitaires");
+    const sanitaires = etat.objets.filter(o => CAT[o.type].groupe === "Sanitaires" && !["paroi", "colonneDouche"].includes(o.type)).length
+      + nb(["vasque", "double", "vasquePoser"]);
+    ajoute("Silicone sanitaire", pl(Math.max(1, Math.ceil(sanitaires / 2)), "cartouche"), "joints autour des sanitaires, une cartouche pour deux");
+    const fix = nb(["barre"]) + nb(["siegeDouche"]);
+    if (fix) ajoute("Chevilles et vis inox", pl(fix, "kit"), "fixation des barres et du siège de douche");
     return liste;
   }
   // Texte de commande prêt à envoyer (WhatsApp, SMS, mail) au fournisseur
@@ -1122,7 +1128,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
   });
   renderer.domElement.addEventListener("pointerup", e => {
     if (!glisse && depart && Math.hypot(e.clientX - depart.x, e.clientY - depart.y) < 5) { selection = null; afficherSelection(); }
-    if (glisse && selection !== null) { const t = etat.objets[selection]?.type; if (t === "douche") construirePiece(); else if (t === "porte" || t === "fenetre") majMetre(); }
+    if (glisse && selection !== null) { const t = etat.objets[selection]?.type; if (estDouche(t)) construirePiece(); else if (t === "porte" || t === "fenetre") majMetre(); }
     glisse = false; controles.enabled = true;
   });
 
@@ -1158,7 +1164,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
   }
   const refaire = () => {
     const i = selection, o = etat.objets[i]; refaireIndex(i);
-    if (o.type === "douche") construirePiece(); else majMetre();
+    if (estDouche(o.type)) construirePiece(); else majMetre();
   };
   panneauSel.addEventListener("change", e => {
     const t = e.target, o = etat.objets[selection]; if (!o) return;
@@ -1478,7 +1484,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
       const [x, z] = pointPiece(e), o = etat.objets[choisi];
       o.x = x - glisse.dx; o.z = z - glisse.dz; placer(choisi); redessiner();
     });
-    const lacher = () => { if (!glisse) return; glisse = null; cv.style.cursor = "grab"; if (etat.objets[choisi]?.type === "douche") construirePiece(); else majMetre(); };
+    const lacher = () => { if (!glisse) return; glisse = null; cv.style.cursor = "grab"; if (estDouche(etat.objets[choisi]?.type)) construirePiece(); else majMetre(); };
     cv.addEventListener("pointerup", lacher); cv.addEventListener("pointercancel", lacher);
     // pièce : longueur, largeur, hauteur
     v.querySelector("#planPiece").addEventListener("change", e => {
@@ -1494,7 +1500,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
       if (t.dataset.ptaille !== undefined) { if (!t.value) return; [o.w, o.d] = t.value.split("x").map(x => Number(x) / 100); }
       else if (t.dataset.pod) o[t.dataset.pod] = Math.max(1, Number(t.value) || 0) / 100;
       else return;
-      selection = choisi; refaire(); if (o.type === "douche") construirePiece(); afficherSelection();
+      selection = choisi; refaire(); if (estDouche(o.type)) construirePiece(); afficherSelection();
       zoneEl.dataset.pour = ""; redessiner();
     });
     v.querySelector("#planAjout").onchange = e => { if (!e.target.value) return; choisi = ajouterObjet(e.target.value); e.target.value = ""; redessiner(); };
@@ -1756,12 +1762,7 @@ KA Rénovation — 07 63 14 76 27`;
       if (m.peinture > .5) ajoute("Peinture murs", "Peinture / Finitions", arr(m.peinture), "m2");
       ajoute("Peinture plafond", "Finitions", arr(m.plafond), "m2");
       ajoute("Nettoyage fin de chantier", "Finitions", 1);
-      // consommables de l'artisan (le client achète lui-même carrelage, sanitaires, meubles et peinture)
-      const PLACO = /Rails|Montants|Cornières|Laine|Fourrures|Suspentes|Plaques|Vis TTPC|Bande à joint|Enduit/;
-      const fo = fournitures(), pose = fo.filter(x => !PLACO.test(x.nom)), placo = fo.filter(x => PLACO.test(x.nom));
-      const detail = l => l.map(x => `${x.nom} : ${x.qte}`).join(" ; ");
-      if (pose.length) ajoute("Consommables de pose", "Fournitures", 1, "forfait", detail(pose));
-      if (placo.length) ajoute("Fournitures placo et ossature", "Fournitures", 1, "forfait", detail(placo));
+      // les consommables et fournitures de placo sont compris dans les prix des prestations : pas de ligne à part
       ajoute("Frais de déplacement", "Déplacement", 1, "forfait");
       await enregistrer();
       await creerDevis(sections, client, etat.nom);
