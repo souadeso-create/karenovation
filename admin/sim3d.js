@@ -215,6 +215,22 @@ const matBois = c => new THREE.MeshStandardMaterial({ color: new THREE.Color(c),
 const boite = (w, h, d, m) => { const x = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); x.castShadow = x.receiveShadow = true; return x; };
 const cyl = (r, h, m, s = 16) => { const x = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, s), m); x.castShadow = true; return x; };
 const pose = (o, x, y, z) => { o.position.set(x, y, z); return o; };
+const RECEVEURS = { Blanc: MAT.receveurBlanc, Noir: MAT.receveurNoir,
+  Gris: new THREE.MeshStandardMaterial({ color: 0x8a8a88, roughness: .7 }), Beige: new THREE.MeshStandardMaterial({ color: 0xd8cbb6, roughness: .7 }) };
+const DEPOLI = new THREE.MeshStandardMaterial({ color: 0xf4f6f6, roughness: .6, transparent: true, opacity: .7, side: THREE.DoubleSide });
+const FOND2 = MAT.fond.clone(); FOND2.side = THREE.DoubleSide;
+// forme plane (x, profondeur) posée à plat : le dos de la forme est contre le mur (z-)
+function aPlat(forme, epaisseur, m, w, d) {
+  const g = epaisseur ? new THREE.ExtrudeGeometry(forme, { depth: epaisseur, bevelEnabled: false, curveSegments: 24 }) : new THREE.ShapeGeometry(forme, 24);
+  const x = new THREE.Mesh(g, m); x.rotation.x = Math.PI / 2; x.position.set(-w / 2, epaisseur, -d / 2); x.castShadow = x.receiveShadow = true; return x;
+}
+// colonne de douche : mitigeur, barre, bras et pomme de tête
+function colonneDouche(g, x, z, haut = 2) {
+  g.add(pose(boite(.18, .06, .05, MAT.robinet), x, 1.05, z));
+  g.add(pose(cyl(.012, haut - 1.05, MAT.robinet), x, (haut + 1.05) / 2, z));
+  const bras = cyl(.01, .3, MAT.robinet); bras.rotation.x = Math.PI / 2; g.add(pose(bras, x, haut, z + .15));
+  g.add(pose(boite(.25, .012, .25, MAT.robinet), x, haut - .01, z + .28));
+}
 function tube(a, b, r, m) {
   const v = new THREE.Vector3().subVectors(b, a), l = v.length();
   const t = cyl(r, l, m, 10); t.position.copy(a).addScaledVector(v, .5);
@@ -264,11 +280,29 @@ const CAT = {
       g.add(pose(boite(.18, .06, .05, MAT.robinet), -w * .1, 1.05, -d / 2 + .03));
       return g; } },
   baignoire: { nom: "Baignoire", groupe: "Sanitaires", pose: "mur", dims: [170, 75, 55], tailles: [[160, 70], [170, 70], [170, 75], [180, 80]],
-    faire(w, d, h) {
+    options: { paroi: ["Sans pare-baignoire", "Avec pare-baignoire"] },
+    faire(w, d, h, o) {
       const g = new THREE.Group();
       g.add(pose(boite(w, h, d, MAT.ceramique), 0, h / 2, 0));
       g.add(pose(new THREE.Mesh(new THREE.BoxGeometry(w - .14, .02, d - .14), MAT.fond), 0, h + .001, 0));
       g.add(pose(boite(.05, .12, .05, MAT.robinet), -w / 2 + .1, h + .06, -d / 2 + .05));
+      if (o?.paroi === "Avec pare-baignoire") { // panneau vitré côté robinet, sur le bord avant
+        g.add(pose(new THREE.Mesh(new THREE.BoxGeometry(.8, 1.4, .008), MAT.verre), -w / 2 + .4, h + .7, d / 2 - .04));
+        g.add(pose(boite(.02, 1.4, .02, MAT.robinet), -w / 2 + .01, h + .7, d / 2 - .04));
+      }
+      return g; } },
+  baignoireAngle: { nom: "Baignoire d'angle", groupe: "Sanitaires", pose: "mur", dims: [140, 140, 55], tailles: [[120, 120], [135, 135], [140, 140], [150, 150]],
+    faire(w, d, h) { // angle coupé côté pièce
+      const g = new THREE.Group(), f = new THREE.Shape(), e = .07;
+      f.moveTo(0, 0); f.lineTo(w, 0); f.lineTo(w, d * .45); f.lineTo(w * .45, d); f.lineTo(0, d); f.lineTo(0, 0);
+      g.add(aPlat(f, h, MAT.ceramique, w, d));
+      const i = new THREE.Shape(); i.moveTo(e, e); i.lineTo(w - e, e); i.lineTo(w - e, d * .45 - e * .4); i.lineTo(w * .45 - e * .4, d - e); i.lineTo(e, d - e); i.lineTo(e, e);
+      const fond = aPlat(i, 0, FOND2, w, d); fond.position.y = h + .002; g.add(fond);
+      g.add(pose(boite(.05, .12, .05, MAT.robinet), -w / 2 + .12, h + .06, -d / 2 + .12));
+      return g; } },
+  baignoireBalneo: { nom: "Baignoire balnéo", groupe: "Sanitaires", pose: "mur", dims: [170, 75, 55], tailles: [[160, 70], [170, 75], [180, 80]],
+    faire(w, d, h) { const g = CAT.baignoire.faire(w, d, h, {});
+      [[-.3, -.15], [.3, -.15], [-.3, .15], [.3, .15]].forEach(([a, b]) => { const j = cyl(.025, .01, MAT.chrome, 16); j.rotation.x = Math.PI / 2; g.add(pose(j, a * w, h * .5, b > 0 ? d / 2 - .07 : -d / 2 + .07)); });
       return g; } },
   ilot: { nom: "Baignoire îlot", groupe: "Sanitaires", pose: "sol", dims: [170, 80, 60], tailles: [[160, 75], [170, 80], [180, 85]],
     faire(w, d, h) {
@@ -297,6 +331,105 @@ const CAT = {
       g.add(pose(cyl(.1, .38, MAT.ceramique, 20), 0, .19, .02));
       const cuv = new THREE.Mesh(new THREE.CapsuleGeometry(w / 2 - .02, Math.max(.01, d - .55), 6, 16), MAT.ceramique);
       cuv.rotation.x = Math.PI / 2; cuv.scale.set(1, 1, .6); cuv.position.set(0, .36, .05); g.add(cuv);
+      return g; } },
+  receveur: { nom: "Receveur de douche seul", groupe: "Sanitaires", pose: "sol", dims: [120, 80, 4],
+    tailles: [[80, 80], [90, 90], [100, 80], [120, 80], [120, 90], [140, 90], [160, 90], [180, 90]],
+    options: { receveur: ["Blanc", "Noir", "Gris", "Beige"], pose: ["Extra-plat posé", "Encastré au ras du sol"] },
+    faire(w, d, h, o) {
+      const g = new THREE.Group(), ep = o?.pose === "Encastré au ras du sol" ? .006 : .03;
+      g.add(pose(boite(w, ep, d, RECEVEURS[o?.receveur] || MAT.receveurBlanc), 0, ep / 2, 0));
+      g.add(pose(boite(.12, .004, .12, MAT.chrome), 0, ep + .002, -d / 2 + .15));
+      return g; } },
+  paroi: { nom: "Paroi de douche seule", groupe: "Sanitaires", pose: "sol", dims: [90, 2, 200], tailles: [[70, 2], [80, 2], [90, 2], [100, 2], [120, 2], [140, 2]],
+    options: { profile: ["Profilé noir", "Profilé chromé", "Sans profilé"], verre: ["Verre transparent", "Verre dépoli"] },
+    faire(w, d, h, o) {
+      const g = new THREE.Group();
+      g.add(pose(new THREE.Mesh(new THREE.BoxGeometry(w, h, .008), o?.verre === "Verre dépoli" ? DEPOLI : MAT.verre), 0, h / 2, 0));
+      if (o?.profile !== "Sans profilé") {
+        const m = o?.profile === "Profilé chromé" ? MAT.chrome : MAT.noir;
+        g.add(pose(boite(w, .02, .02, m), 0, h, 0)); g.add(pose(boite(.02, h, .02, m), -w / 2, h / 2, 0));
+      }
+      return g; } },
+  colonneDouche: { nom: "Colonne de douche", groupe: "Sanitaires", pose: "mur", dims: [25, 30, 200],
+    faire(w, d, h) { const g = new THREE.Group(); colonneDouche(g, 0, -d / 2 + .03, h); return g; } },
+  doucheCabine: { nom: "Douche avec porte (receveur extra-plat)", groupe: "Sanitaires", pose: "sol", dims: [120, 80, 200],
+    tailles: [[80, 80], [90, 90], [100, 80], [120, 80], [120, 90], [140, 90]], options: { receveur: ["Blanc", "Noir", "Gris", "Beige"], porte: ["Porte coulissante", "Porte pivotante"] },
+    faire(w, d, h, o) {
+      const g = new THREE.Group();
+      g.add(pose(boite(w, .04, d, RECEVEURS[o?.receveur] || MAT.receveurBlanc), 0, .02, 0));
+      const coul = o?.porte !== "Porte pivotante";
+      // façade : deux vantaux décalés (coulissante) ou un fixe + une porte
+      g.add(pose(new THREE.Mesh(new THREE.BoxGeometry(w / 2 + (coul ? .05 : 0), h - .05, .008), MAT.verre), -w / 4, h / 2 + .02, d / 2));
+      g.add(pose(new THREE.Mesh(new THREE.BoxGeometry(w / 2 + (coul ? .05 : 0), h - .05, .008), MAT.verre), w / 4, h / 2 + .02, d / 2 - (coul ? .03 : 0)));
+      g.add(pose(boite(.02, .3, .03, MAT.chrome), coul ? -.02 : w / 2 - .08, 1.05, d / 2 + .02));
+      g.add(pose(new THREE.Mesh(new THREE.BoxGeometry(.008, h - .05, d), MAT.verre), w / 2, h / 2 + .02, 0)); // côté
+      g.add(pose(boite(w, .02, .02, MAT.chrome), 0, h, d / 2)); g.add(pose(boite(.02, .02, d, MAT.chrome), w / 2, h, 0));
+      colonneDouche(g, -w * .1, -d / 2 + .03, h);
+      return g; } },
+  doucheAngle: { nom: "Douche d'angle quart de rond", groupe: "Sanitaires", pose: "sol", dims: [90, 90, 200], tailles: [[80, 80], [90, 90], [100, 100]],
+    options: { receveur: ["Blanc", "Noir", "Gris", "Beige"] },
+    faire(w, d, h, o) { // l'angle est au fond à gauche
+      const g = new THREE.Group(), f = new THREE.Shape();
+      f.moveTo(0, 0); f.lineTo(w, 0); f.absellipse(0, 0, w, d, 0, Math.PI / 2, false); f.lineTo(0, 0);
+      g.add(aPlat(f, .04, RECEVEURS[o?.receveur] || MAT.receveurBlanc, w, d));
+      const v = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, h - .05, 32, 1, true, 0, Math.PI / 2), MAT.verre);
+      v.scale.set(w, 1, d); v.position.set(-w / 2, h / 2 + .02, -d / 2); g.add(v);
+      const r = new THREE.Mesh(new THREE.TorusGeometry(1, .01, 6, 32, Math.PI / 2), MAT.chrome);
+      r.rotation.x = Math.PI / 2; r.scale.set(w, d, 1); r.position.set(-w / 2, h, -d / 2); g.add(r);
+      colonneDouche(g, w * .05, -d / 2 + .03, h);
+      return g; } },
+  bidet: { nom: "Bidet", groupe: "Sanitaires", pose: "mur", dims: [37, 54, 40], options: { style: ["Suspendu", "Au sol"] },
+    faire(w, d, h, o) {
+      const g = new THREE.Group(), sol = o?.style === "Au sol";
+      if (sol) g.add(pose(cyl(.1, .36, MAT.ceramique, 20), 0, .18, 0)); else g.add(pose(boite(.45, .5, .15, MAT.blanc), 0, .45, -d / 2 + .075));
+      const cuv = new THREE.Mesh(new THREE.CapsuleGeometry(w / 2 - .02, Math.max(.01, d - .42), 6, 16), MAT.ceramique);
+      cuv.rotation.x = Math.PI / 2; cuv.scale.set(1, 1, .6); cuv.position.set(0, .34, .03); cuv.castShadow = true; g.add(cuv);
+      g.add(pose(new THREE.Mesh(new THREE.CylinderGeometry(w / 2 - .06, w / 2 - .08, .005, 24), MAT.fond), 0, .42, .03));
+      g.add(pose(cyl(.01, .12, MAT.robinet), 0, .46, -d / 2 + .1));
+      return g; } },
+  lavaboColonne: { nom: "Lavabo sur colonne", groupe: "Sanitaires", pose: "mur", dims: [60, 45, 85], tailles: [[50, 40], [55, 45], [60, 45], [65, 50]],
+    faire(w, d) {
+      const g = new THREE.Group();
+      g.add(pose(cyl(.09, .7, MAT.ceramique, 20), 0, .35, -d / 2 + .14));
+      g.add(pose(boite(w, .15, d, MAT.ceramique), 0, .8, 0));
+      g.add(pose(new THREE.Mesh(new THREE.BoxGeometry(w - .1, .01, d - .12), MAT.fond), 0, .876, .02));
+      g.add(pose(cyl(.012, .2, MAT.robinet), 0, .97, -d / 2 + .05));
+      return g; } },
+  lavaboSuspendu: { nom: "Lavabo suspendu", groupe: "Sanitaires", pose: "mur", dims: [55, 42, 15], tailles: [[45, 35], [55, 42], [60, 45], [80, 45]],
+    faire(w, d) {
+      const g = new THREE.Group();
+      g.add(pose(boite(w, .15, d, MAT.ceramique), 0, .8, 0));
+      g.add(pose(new THREE.Mesh(new THREE.BoxGeometry(w - .1, .01, d - .12), MAT.fond), 0, .876, .02));
+      g.add(pose(cyl(.012, .2, MAT.robinet), 0, .97, -d / 2 + .05));
+      return g; } },
+  wcLaveMains: { nom: "WC suspendu + lave-mains intégré", groupe: "Sanitaires", pose: "mur", dims: [50, 55, 40],
+    faire(w, d, h) {
+      const g = CAT.wc.faire(.37, d, h);
+      g.add(pose(boite(.42, .07, .2, MAT.ceramique), 0, 1.135, -d / 2 + .1));
+      g.add(pose(new THREE.Mesh(new THREE.BoxGeometry(.34, .01, .13), MAT.fond), 0, 1.171, -d / 2 + .11));
+      g.add(pose(cyl(.008, .12, MAT.robinet), .12, 1.23, -d / 2 + .03));
+      return g; } },
+  bacLaver: { nom: "Bac à laver", groupe: "Sanitaires", pose: "mur", dims: [60, 50, 85], tailles: [[45, 40], [60, 50], [80, 50]],
+    faire(w, d, h) {
+      const g = new THREE.Group();
+      g.add(pose(boite(w, .3, d, MAT.plastique), 0, h - .15, 0));
+      g.add(pose(new THREE.Mesh(new THREE.BoxGeometry(w - .06, .01, d - .06), MAT.fond), 0, h + .002, 0));
+      [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([a, b]) => g.add(pose(cyl(.02, h - .3, MAT.plastique), a * (w / 2 - .04), (h - .3) / 2, b * (d / 2 - .04))));
+      g.add(pose(cyl(.012, .25, MAT.robinet), 0, h + .12, -d / 2 + .03));
+      return g; } },
+  siegeDouche: { nom: "Siège de douche rabattable", groupe: "Équipements", pose: "mur", dims: [40, 35, 45],
+    faire(w, d, h) {
+      const g = new THREE.Group();
+      g.add(pose(boite(w, .03, d, MAT.blanc), 0, h, 0));
+      g.add(pose(boite(w, .08, .03, MAT.chrome), 0, h + .02, -d / 2 + .015));
+      [-1, 1].forEach(a => g.add(tube(new THREE.Vector3(a * (w / 2 - .03), h, d / 2 - .03), new THREE.Vector3(a * (w / 2 - .03), h - .25, -d / 2 + .02), .01, MAT.chrome)));
+      return g; } },
+  barre: { nom: "Barre de maintien", groupe: "Équipements", pose: "mur", dims: [60, 8, 4], tailles: [[30, 8], [45, 8], [60, 8], [90, 8]], hauteur: 85,
+    options: { couleur: ["Chromé", "Blanc", "Comme la robinetterie"] },
+    faire(w, d, h, o) {
+      const g = new THREE.Group(), m = o?.couleur === "Blanc" ? MAT.blanc : o?.couleur === "Comme la robinetterie" ? MAT.robinet : MAT.chrome;
+      const b = cyl(.016, w, m); b.rotation.z = Math.PI / 2; g.add(pose(b, 0, .02, d / 2 - .02));
+      [-1, 1].forEach(a => { const p = cyl(.016, d, m); p.rotation.x = Math.PI / 2; g.add(pose(p, a * (w / 2 - .01), .02, 0)); });
       return g; } },
   vasque: { nom: "Meuble vasque", groupe: "Meubles", pose: "mur", dims: [80, 46, 55], tailles: [[60, 46], [80, 46], [100, 46]], options: { finition: Object.keys(BOIS), style: ["Suspendu", "Sur pieds"], facade: ["2 tiroirs", "1 tiroir", "Portes", "Sans poignée"] }, faire: (w, d, h, o) => meuble(w, d, h, 1, o) },
   double: { nom: "Double vasque", groupe: "Meubles", pose: "mur", dims: [120, 46, 55], tailles: [[120, 46], [140, 46], [160, 46]], options: { finition: Object.keys(BOIS), style: ["Suspendu", "Sur pieds"], facade: ["2 tiroirs", "1 tiroir", "Portes", "Sans poignée"] }, faire: (w, d, h, o) => meuble(w, d, h, 2, o) },
@@ -417,6 +550,20 @@ const POUR_DEVIS = {
   double: ["Pose meuble double vasque suspendu", "Menuiserie / Installations"],
   vasquePoser: ["Pose du meuble vasque", "Menuiserie / Installations"],
   laveMains: ["Installation d'un lavabo", "Plomberie"],
+  lavaboColonne: ["Installation d'un lavabo", "Plomberie"],
+  lavaboSuspendu: ["Installation d'un lavabo", "Plomberie"],
+  wcLaveMains: ["Installation WC suspendu", "Plomberie"],
+  receveur: ["Pose receveur de douche extra-plat", "Plomberie"],
+  doucheCabine: ["Pose receveur de douche extra-plat", "Plomberie"],
+  doucheAngle: ["Pose receveur de douche extra-plat", "Plomberie"],
+  paroi: ["Pose paroi de douche", "Plomberie"],
+  colonneDouche: ["Pose colonne de douche", "Plomberie"],
+  baignoireAngle: ["Pose baignoire avec raccordements", "Plomberie"],
+  baignoireBalneo: ["Pose baignoire avec raccordements", "Plomberie"],
+  bidet: ["Pose bidet", "Plomberie"],
+  bacLaver: ["Pose bac à laver", "Plomberie"],
+  siegeDouche: ["Pose siège de douche rabattable", "Menuiserie / Installations"],
+  barre: ["Pose barre de maintien", "Menuiserie / Installations"],
   colonne: ["Pose et fixation du meuble sous vasque et de rangement", "Menuiserie / Installations"],
   meubleHaut: ["Pose et fixation du meuble sous vasque et de rangement", "Menuiserie / Installations"],
   armoire: ["Installation et fixation du miroir avec raccordement", "Électricité"],
@@ -438,10 +585,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     nom: "Salle de bain", dims: { l: 2.6, p: 2.0, h: 2.5 },
     murs: { matiere: "blanc", format: "60x120", joint: "gris" }, accent: { matiere: "bleu", format: "7.5x15", joint: "blanc", actif: false },
     sol: { matiere: "beton", format: "60x60", joint: "gris" }, faience: "plafond", peinture: "#f3f1ec", depose: true,
-    objets: [
-      { type: "douche", x: .7, z: -.55, rot: 0 }, { type: "double", x: -.55, z: -.8, rot: 0 }, { type: "miroir", x: -.55, z: -.98, rot: 0 },
-      { type: "wc", x: -1.1, z: .35, rot: Math.PI / 2 }, { type: "porte", x: 1.3, z: .45, rot: -Math.PI / 2 }, { type: "radiateur", x: -1.3, z: .8, rot: Math.PI / 2 }, { type: "prise", x: -.1, z: -1, rot: 0 }
-    ]
+    objets: [] // une nouvelle simulation commence vide : l'artisan pose ce qu'il veut
   });
   let validation = {}, etat = defaut(), simId = null, client = null, selection = null, chantier = false;
   etat.robinetterie = "noir";
@@ -1549,7 +1693,7 @@ KA Rénovation — 07 63 14 76 27`;
         if (deja.has(mot)) continue; deja.add(mot);
         ajoute(mot, cat, ["arrivees", "evacuation"].includes(t) ? 1 : n);
       }
-      if (comptes.douche) ajoute("SPEC étanchéité", "Placo / Étanchéité / Sol", 1);
+      if (comptes.douche || comptes.receveur || comptes.doucheCabine || comptes.doucheAngle) ajoute("SPEC étanchéité", "Placo / Étanchéité / Sol", 1);
       ajoute("Ragréage", "Placo / Étanchéité / Sol", arr(m.sol), "m2");
       const cof = coffrages().filter(c => c.creer), dev = cof.reduce((a, c) => a + c.visible, 0);
       if (dev > .05 || etat.fauxPlafond) ajoute("Placo BA13 hydro", "Placo / Étanchéité / Sol", 1, "presta",
