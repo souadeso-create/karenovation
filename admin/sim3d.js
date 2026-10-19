@@ -591,10 +591,8 @@ const HORS_FORFAIT = new Set(["wc", "wcSol", "wcLaveMains", "bidet", "baignoire"
 const FORFAITS = [[4, "Petite salle de bain"], [6, "Salle de bain moyenne"], [9, "Grande salle de bain, de 6"], [Infinity, "Très grande salle de bain"]];
 
 // Recherche de l'article chez les magasins : la page du magasin s'ouvre dans un nouvel onglet
-// Leroy Merlin et Brico Dépôt n'ont pas d'adresse de recherche ouvrable directement : recherche Google limitée à leur site
-const surSite = site => q => `https://www.google.com/search?q=site%3A${site}+${q}`;
-const MAGASINS = [["Leroy Merlin", surSite("leroymerlin.fr")], ["Castorama", q => `https://www.castorama.fr/search?term=${q}`],
-  ["Brico Dépôt", surSite("bricodepot.fr")], ["ManoMano", q => `https://www.manomano.fr/recherche/${q}`],
+const MAGASINS = [["Leroy Merlin", q => `https://www.leroymerlin.fr/search?q=${q}`], ["Castorama", q => `https://www.castorama.fr/search?term=${q}`],
+  ["Brico Dépôt", q => `https://www.bricodepot.fr/search?search-term=${q}`], ["ManoMano", q => `https://www.manomano.fr/recherche/${q}`],
   ["Point.P", q => `https://www.pointp.fr/search?q=${q}`], ["Mr.Bricolage", q => `https://www.mr-bricolage.fr/catalogsearch/result/?q=${q}`],
   ["Bricomarché", q => `https://www.bricomarche.com/search?q=${q}`]];
 function magasins(terme) { return `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${MAGASINS.map(([nom, url]) =>
