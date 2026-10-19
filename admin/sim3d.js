@@ -582,6 +582,13 @@ const POUR_DEVIS = {
   spot: ["Pose de spot LED", "Électricité"]
 };
 
+// Ce que les forfaits « Rénovation complète » comprennent déjà : douche ou receveur, paroi, colonne, meuble vasque,
+// miroir, prises, éclairage, réseaux, placo, étanchéité, ragréage, carrelage. Le reste s'ajoute au forfait.
+const HORS_FORFAIT = new Set(["wc", "wcSol", "wcLaveMains", "bidet", "baignoire", "baignoireAngle", "baignoireBalneo", "ilot", "laveMains",
+  "lavaboColonne", "lavaboSuspendu", "bacLaver", "laveLinge", "vmc", "radiateur", "radiateurEau", "siegeDouche", "barre", "porte", "armoire",
+  "colonne", "meubleHaut", "etagere"]);
+const FORFAITS = [[4, "Petite salle de bain"], [6, "Salle de bain moyenne"], [9, "Grande salle de bain, de 6"], [Infinity, "Très grande salle de bain"]];
+
 /* =================================================================== */
 export async function monterSimulateur(vue, { db, params, toast, esc, choisirClient, nomClient, creerDevis }) {
   const defaut = () => ({
@@ -866,6 +873,22 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     return selection;
   }
   // Ajout : une fenêtre s'ouvre là où l'on est ; on choisit, on valide, et la page ne bouge pas.
+  // Forfait ou détail : true pour le forfait, false pour le détail, null si l'on ferme
+  function choisirForfait(p, surface) {
+    return new Promise(ok => {
+      const v = document.createElement("div"); v.className = "voile";
+      v.innerHTML = `<div class="fenetre" role="dialog" aria-modal="true"><div class="tete"><h2>Rénovation complète</h2><button class="icone" data-fermer aria-label="Fermer">✕</button></div>
+        <p style="margin-bottom:6px">Surface au sol : <b>${surface.toLocaleString("fr-FR")} m²</b></p>
+        <p class="gris" style="font-size:14px;margin-bottom:16px">${esc(p.designation.split(" : ")[0])}. Ce qui n'est pas compris dans le forfait (WC, baignoire, sèche-serviettes, peinture…) s'ajoute en lignes séparées.</p>
+        <div class="actions-doc" style="margin-bottom:0"><button type="button" class="btn" data-f="1">Devis au forfait</button><button type="button" class="btn discret" data-f="0">Détail ligne par ligne</button></div></div>`;
+      document.body.appendChild(v);
+      v.addEventListener("click", e => {
+        const b = e.target.closest("[data-f]");
+        if (b) { v.remove(); ok(b.dataset.f === "1"); }
+        else if (e.target === v || e.target.closest("[data-fermer]")) { v.remove(); ok(null); }
+      });
+    });
+  }
   function choisirAvantAjout(t) {
     const c = CAT[t], o = { type: t, x: 0, z: 0, rot: 0 }; completer(o);
     const v = document.createElement("div"); v.className = "voile";
@@ -1687,9 +1710,30 @@ KA Rénovation — 07 63 14 76 27`;
           : { designation: mot, description, qte, unite: unite || "presta", pu: 0 });
       };
       const m = metre(), arr = n => Math.round(n * 10) / 10;
-      if (etat.depose) ajoute("Dépose complète salle de bain", "Dépose & évacuation", 1);
       const comptes = {};
       etat.objets.forEach(o => { if (POUR_DEVIS[o.type] && !/^Exist/.test(o.travaux || "")) comptes[o.type] = (comptes[o.type] || 0) + 1; });
+      // Salle de bain complète : forfait selon la surface au sol, ou détail ligne par ligne, au choix
+      const forfait = etat.depose ? ps.find(p => p.categorie === "Rénovation complète" && p.designation.includes(FORFAITS.find(([max]) => m.sol <= max)[1])) : null;
+      const choix = forfait ? await choisirForfait(forfait, arr(m.sol)) : false;
+      if (choix === null) return; // fenêtre fermée : rien n'est créé
+      if (choix) {
+        lot(forfait.categorie).lignes.push({ designation: forfait.designation, description: `Surface au sol : ${arr(m.sol).toLocaleString("fr-FR")} m²`, qte: 1, unite: forfait.unite, pu: Number(forfait.prix_ht) });
+        const deja = new Set();
+        for (const [t, n] of Object.entries(comptes)) {
+          if (!HORS_FORFAIT.has(t)) continue;
+          const [mot, cat] = POUR_DEVIS[t];
+          if (deja.has(mot)) continue; deja.add(mot);
+          ajoute(mot, cat, n);
+        }
+        const dem = etat.objets.filter(o => o.type === "demolition");
+        if (dem.length) ajoute("Démolition de cloison", "Dépose & évacuation", arr(dem.reduce((a, o) => a + o.w, 0)), "ml", "Démolition, évacuation des gravats en déchetterie");
+        if (m.peinture > .5) ajoute("Peinture murs", "Peinture / Finitions", arr(m.peinture), "m2");
+        ajoute("Peinture plafond", "Finitions", arr(m.plafond), "m2");
+        await enregistrer();
+        await creerDevis(sections, client, etat.nom);
+        return;
+      }
+      if (etat.depose) ajoute("Dépose complète salle de bain", "Dépose & évacuation", 1);
       const deja = new Set();
       for (const [t, n] of Object.entries(comptes)) {
         const [mot, cat] = POUR_DEVIS[t];
