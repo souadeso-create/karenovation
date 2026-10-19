@@ -1,5 +1,5 @@
 // Accès aux données : Supabase quand il est configuré, sinon le navigateur (mode essai).
-import { PARAMETRES_DEFAUT, PRESTATIONS_DEFAUT, AJOUTS_PRESTATIONS } from "./donnees.js";
+import { PARAMETRES_DEFAUT, PRESTATIONS_DEFAUT, AJOUTS_PRESTATIONS, CORRECTIONS_PRESTATIONS } from "./donnees.js";
 
 const cfg = window.KA_CONFIG || {};
 export const MODE_ESSAI = !(cfg.supabaseUrl && cfg.supabaseKey);
@@ -185,12 +185,22 @@ export async function ajouterNouvellesPrestations() {
   else { const { data } = await sb.from("parametres").select("data").eq("id", 1).maybeSingle(); brut = data?.data || {}; }
   const faits = brut.ajouts_prestations || [];
   const reste = AJOUTS_PRESTATIONS.filter(a => !faits.includes(a.cle));
-  if (!reste.length) return;
-  const deja = new Set((await lister("prestations")).map(x => x.designation));
+  const corr = (CORRECTIONS_PRESTATIONS || []).filter(c => !faits.includes(c.cle));
+  if (!reste.length && !corr.length) return;
+  const toutes = await lister("prestations");
+  for (const c of corr) {
+    for (const x of toutes) {
+      if (!x.designation) continue;
+      let d = x.designation;
+      for (const [ancien, nouveau] of c.remplacer) d = d.replace(ancien, nouveau);
+      if (d !== x.designation) { x.designation = d; await enregistrer("prestations", { id: x.id, designation: d }); }
+    }
+  }
+  const deja = new Set(toutes.map(x => x.designation));
   for (const a of reste)
     for (const [categorie, designation, unite, prix_ht] of a.lignes)
       if (!deja.has(designation)) await enregistrer("prestations", { categorie, designation, unite, prix_ht });
-  await enregistrerParametres({ ...brut, ajouts_prestations: [...faits, ...reste.map(a => a.cle)] });
+  await enregistrerParametres({ ...brut, ajouts_prestations: [...faits, ...reste.map(a => a.cle), ...corr.map(c => c.cle)] });
 }
 
 /* ---------- Sauvegarde complète (fichier) ---------- */

@@ -43,10 +43,10 @@ export const UNITES = ["presta", "m2", "ml", "u", "h", "forfait"];
 
 // [catégorie, désignation, unité, prix HT]
 export const PRESTATIONS_DEFAUT = [
-  ["Rénovation complète", "Rénovation complète clé en main · Petite salle de bain, jusqu'à 4 m² : dépose et évacuation, plomberie (douche à l'italienne ou receveur, WC, meuble vasque), électricité (prises, éclairage, VMC), placo hydro, étanchéité SPEC, ragréage, pose du carrelage sol et murs, pose des équipements, nettoyage. Carrelage, sanitaires et meubles fournis par le client", "forfait", 2271.82],
-  ["Rénovation complète", "Rénovation complète clé en main · Salle de bain moyenne, de 4 à 6 m² : dépose et évacuation, plomberie (douche à l'italienne ou receveur, WC, meuble vasque), électricité (prises, éclairage, VMC), placo hydro, étanchéité SPEC, ragréage, pose du carrelage sol et murs, pose des équipements, nettoyage. Carrelage, sanitaires et meubles fournis par le client", "forfait", 2999.09],
-  ["Rénovation complète", "Rénovation complète clé en main · Grande salle de bain, de 6 à 9 m² : dépose et évacuation, plomberie (douche à l'italienne ou receveur, WC, meuble vasque), électricité (prises, éclairage, VMC), placo hydro, étanchéité SPEC, ragréage, pose du carrelage sol et murs, pose des équipements, nettoyage. Carrelage, sanitaires et meubles fournis par le client", "forfait", 3908.18],
-  ["Rénovation complète", "Rénovation complète clé en main · Très grande salle de bain, plus de 9 m² : dépose et évacuation, plomberie (douche à l'italienne ou receveur, WC, meuble vasque), électricité (prises, éclairage, VMC), placo hydro, étanchéité SPEC, ragréage, pose du carrelage sol et murs, pose des équipements, nettoyage. Carrelage, sanitaires et meubles fournis par le client", "forfait", 4999.09],
+  ["Rénovation complète", "Rénovation complète clé en main · Petite salle de bain, jusqu'à 4 m² : dépose et évacuation, plomberie (douche à l'italienne ou receveur, meuble vasque), électricité (prises, éclairage), placo hydro, étanchéité SPEC, ragréage, pose du carrelage sol et murs, pose des équipements, nettoyage. Carrelage, sanitaires et meubles fournis par le client", "forfait", 2271.82],
+  ["Rénovation complète", "Rénovation complète clé en main · Salle de bain moyenne, de 4 à 6 m² : dépose et évacuation, plomberie (douche à l'italienne ou receveur, meuble vasque), électricité (prises, éclairage), placo hydro, étanchéité SPEC, ragréage, pose du carrelage sol et murs, pose des équipements, nettoyage. Carrelage, sanitaires et meubles fournis par le client", "forfait", 2999.09],
+  ["Rénovation complète", "Rénovation complète clé en main · Grande salle de bain, de 6 à 9 m² : dépose et évacuation, plomberie (douche à l'italienne ou receveur, meuble vasque), électricité (prises, éclairage), placo hydro, étanchéité SPEC, ragréage, pose du carrelage sol et murs, pose des équipements, nettoyage. Carrelage, sanitaires et meubles fournis par le client", "forfait", 3908.18],
+  ["Rénovation complète", "Rénovation complète clé en main · Très grande salle de bain, plus de 9 m² : dépose et évacuation, plomberie (douche à l'italienne ou receveur, meuble vasque), électricité (prises, éclairage), placo hydro, étanchéité SPEC, ragréage, pose du carrelage sol et murs, pose des équipements, nettoyage. Carrelage, sanitaires et meubles fournis par le client", "forfait", 4999.09],
   ["Dépose & évacuation", "Dépose complète salle de bain (carrelages, sanitaires, faux plafond, etc.) + évacuation et mise en décharge, préparation des supports", "presta", 400],
   ["Dépose & évacuation", "Dépose de carrelage existant, nettoyage de la surface et évacuation", "m2", 30],
   ["Plomberie", "Création douche à l'italienne carrelée (receveur carrelé, siphon & étanchéité, colonne de douche)", "presta", 1050],
@@ -72,4 +72,12 @@ export const PRESTATIONS_DEFAUT = [
 // Celles que l'artisan a déjà (même désignation, même archivées) ne sont pas ajoutées deux fois.
 export const AJOUTS_PRESTATIONS = [
   { cle: "forfaits-taille-2026-10", lignes: PRESTATIONS_DEFAUT.filter(p => p[0] === "Rénovation complète") }
+];
+
+// Désignations corrigées après coup : une ligne restée telle quelle chez l'artisan prend le nouveau texte.
+// Une ligne qu'il a modifiée lui-même n'est pas touchée.
+export const CORRECTIONS_PRESTATIONS = [
+  { cle: "forfaits-sans-vmc-ni-wc-2026-10", remplacer: [
+    ["électricité (prises, éclairage, VMC), placo hydro", "électricité (prises, éclairage), placo hydro"],
+    ["(douche à l'italienne ou receveur, WC, meuble vasque)", "(douche à l'italienne ou receveur, meuble vasque)"]] }
 ];
