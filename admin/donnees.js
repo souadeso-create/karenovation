@@ -101,11 +101,28 @@ export const PRESTATIONS_SUITE = [
 ];
 PRESTATIONS_DEFAUT.push(...PRESTATIONS_SUITE);
 
+// Prestations des éléments de la simulation 3D, ajoutées le 19/10/2026 (prix HT, TVA 10 %).
+export const PRESTATIONS_3D = [
+  ["Plomberie", "Pose lavabo (suspendu ou sur colonne) avec raccordements", "presta", 150],
+  ["Plomberie", "Pose plan et vasque à poser avec robinetterie", "presta", 220],
+  ["Plomberie", "Pose bidet avec raccordements", "presta", 180],
+  ["Plomberie", "Pose bac à laver avec raccordements", "presta", 150],
+  ["Plomberie", "Raccordement lave-linge (arrivée d'eau et évacuation)", "presta", 90],
+  ["Menuiserie / Installations", "Pose meuble de rangement (colonne ou meuble haut)", "presta", 60],
+  ["Menuiserie / Installations", "Pose étagère ou niche", "presta", 40],
+  ["Menuiserie / Installations", "Pose siège de douche rabattable", "presta", 60],
+  ["Menuiserie / Installations", "Pose barre de maintien", "u", 40],
+  ["Électricité", "Pose armoire de toilette avec raccordement", "presta", 90],
+  ["Dépose & évacuation", "Démolition de cloison, évacuation des gravats", "ml", 45]
+];
+PRESTATIONS_DEFAUT.push(...PRESTATIONS_3D);
+
 // Prestations ajoutées après coup : versées une seule fois dans une base déjà remplie.
 // Celles que l'artisan a déjà (même désignation, même archivées) ne sont pas ajoutées deux fois.
 export const AJOUTS_PRESTATIONS = [
   { cle: "forfaits-taille-2026-10", lignes: PRESTATIONS_DEFAUT.filter(p => p[0] === "Rénovation complète" && !PRESTATIONS_SUITE.includes(p)) },
-  { cle: "prestations-suite-2026-10", lignes: PRESTATIONS_SUITE }
+  { cle: "prestations-suite-2026-10", lignes: PRESTATIONS_SUITE },
+  { cle: "prestations-3d-2026-10", lignes: PRESTATIONS_3D }
 ];
 
 // Désignations corrigées après coup : une ligne restée telle quelle chez l'artisan prend le nouveau texte.

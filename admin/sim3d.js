@@ -542,16 +542,16 @@ const AMBIANCE = { murs: null, peinture: "#f3f1ec", faience: "plafond", h: 2.5 }
 /* =================== Métré → lignes de devis (mots cherchés dans les prestations) =================== */
 const POUR_DEVIS = {
   douche: ["Création douche à l'italienne", "Plomberie"],
-  baignoire: ["Dépose et pose d'une nouvelle baignoire", "Plomberie"],
-  ilot: ["Dépose et pose d'une nouvelle baignoire", "Plomberie"],
+  baignoire: ["Pose baignoire avec raccordements", "Plomberie"],
+  ilot: ["Pose baignoire avec raccordements", "Plomberie"],
   wc: ["Installation WC suspendu", "Plomberie"],
-  wcSol: ["Pose de la cuvette", "Plomberie"],
-  vasque: ["Pose du meuble vasque", "Menuiserie / Installations"],
+  wcSol: ["Pose WC au sol", "Plomberie"],
+  vasque: ["Pose meuble simple vasque", "Plomberie"],
   double: ["Pose meuble double vasque suspendu", "Menuiserie / Installations"],
-  vasquePoser: ["Pose du meuble vasque", "Menuiserie / Installations"],
-  laveMains: ["Installation d'un lavabo", "Plomberie"],
-  lavaboColonne: ["Installation d'un lavabo", "Plomberie"],
-  lavaboSuspendu: ["Installation d'un lavabo", "Plomberie"],
+  vasquePoser: ["Pose plan et vasque à poser", "Plomberie"],
+  laveMains: ["Pose lave-mains", "Plomberie"],
+  lavaboColonne: ["Pose lavabo", "Plomberie"],
+  lavaboSuspendu: ["Pose lavabo", "Plomberie"],
   wcLaveMains: ["Installation WC suspendu", "Plomberie"],
   receveur: ["Pose receveur de douche extra-plat", "Plomberie"],
   doucheCabine: ["Pose receveur de douche extra-plat", "Plomberie"],
@@ -564,16 +564,19 @@ const POUR_DEVIS = {
   bacLaver: ["Pose bac à laver", "Plomberie"],
   siegeDouche: ["Pose siège de douche rabattable", "Menuiserie / Installations"],
   barre: ["Pose barre de maintien", "Menuiserie / Installations"],
-  colonne: ["Pose et fixation du meuble sous vasque et de rangement", "Menuiserie / Installations"],
-  meubleHaut: ["Pose et fixation du meuble sous vasque et de rangement", "Menuiserie / Installations"],
-  armoire: ["Installation et fixation du miroir avec raccordement", "Électricité"],
+  colonne: ["Pose meuble de rangement", "Menuiserie / Installations"],
+  meubleHaut: ["Pose meuble de rangement", "Menuiserie / Installations"],
+  armoire: ["Pose armoire de toilette", "Électricité"],
+  radiateur: ["Pose sèche-serviettes électrique", "Électricité"],
+  laveLinge: ["Raccordement lave-linge", "Plomberie"],
+  etagere: ["Pose étagère ou niche", "Menuiserie / Installations"],
   miroir: ["Installation miroir éclairé", "Électricité"],
   miroirRect: ["Installation miroir éclairé", "Électricité"],
   porte: ["Pose bloc-porte coulissant", "Menuiserie / Installations"],
   radiateurEau: ["Déplacement radiateur à eau", "Plomberie"],
   arrivees: ["Modification alimentations / évacuations", "Plomberie"],
   evacuation: ["Modification alimentations / évacuations", "Plomberie"],
-  prise: ["Pose d'une prise électrique", "Électricité"],
+  prise: ["Création d'une prise", "Électricité"],
   interrupteur: ["Déplacement prise + interrupteur", "Électricité"],
   vmc: ["Installation VMC simple flux", "Électricité"],
   spot: ["Pose de spot LED", "Électricité"]
@@ -1703,9 +1706,9 @@ KA Rénovation — 07 63 14 76 27`;
       const dem = etat.objets.filter(o => o.type === "demolition");
       if (dem.length) ajoute("Démolition de cloison", "Dépose & évacuation", arr(dem.reduce((a, o) => a + o.w, 0)), "ml", "Démolition, évacuation des gravats en déchetterie");
       const f = etat.sol.format;
-      if (f === "parquet") ajoute("Pose de parquet", "Sols", arr(m.sol), "m2");
-      else if (f !== "uni") ajoute(["120x120", "60x120", "80x80"].includes(f) ? "Pose sol grand format" : "Pose carrelage au sol", "Pose carrelage", arr(m.sol), "m2");
-      if (m.murs > 0) ajoute(["60x120", "120x120"].includes(etat.murs.format) ? "Pose mural 60×120" : "Pose carrelage mural", "Pose carrelage", arr(m.murs), "m2");
+      if (f === "parquet") ajoute("Pose sol PVC", "Placo / Étanchéité / Sol", arr(m.sol), "m2", "Lames imitation parquet");
+      else if (f !== "uni") ajoute(["120x120", "60x120", "80x80"].includes(f) ? "Pose sol grand format" : "Pose carrelage sol format standard", "Pose carrelage", arr(m.sol), "m2");
+      if (m.murs > 0) ajoute(["60x120", "120x120"].includes(etat.murs.format) ? "Pose mural 60×120" : "Pose faïence murale format standard", "Pose carrelage", arr(m.murs), "m2");
       if (m.peinture > .5) ajoute("Peinture murs", "Peinture / Finitions", arr(m.peinture), "m2");
       ajoute("Peinture plafond", "Finitions", arr(m.plafond), "m2");
       ajoute("Nettoyage fin de chantier", "Finitions", 1);
