@@ -1,7 +1,7 @@
 // Espace admin KA Rénovation : devis, factures, clients, prestations, simulation 3D.
 import * as db from "./store.js";
 import { UNITES } from "./donnees.js";
-import { telechargerPDF, totaux, eur } from "./pdf.js";
+import { telechargerPDF, totaux, eur, poserTVA, avecTVA, TAUX_TVA, tauxTxt } from "./pdf.js";
 import { CATEGORIES, etatPaiements } from "./carnet.js";
 import { carteRdv, lierRdv } from "./agenda.js";
 
@@ -90,7 +90,7 @@ async function vueAccueil() {
   const aEncaisser = docs.filter(d => d.type === "facture" && d.statut === "envoye");
   const mois = aujourdhui().slice(0, 7);
   const encaisse = docs.filter(d => d.type === "facture" && d.statut === "paye" && String(d.date).slice(0, 7) === mois);
-  const somme = l => l.reduce((a, d) => a + totaux(d).ht, 0);
+  const somme = l => l.reduce((a, d) => a + totaux(d).ttc, 0);
   vue.innerHTML = `
     <div class="entete"><div><div class="petit">Bonjour</div><h1>Tableau de bord</h1></div><a class="btn discret petit-btn" href="#/tuto">▶ Tuto vidéo</a></div>
     <div class="stats">
@@ -154,7 +154,7 @@ function blocChantiers(docs, clients, depenses, montants) {
   });
   return `<div class="carte" style="margin-bottom:22px"><h2 style="margin-bottom:6px">Chantiers en cours</h2>
     <div id="chantiers">${Object.entries(parClient).map(([id, ds]) => {
-      const c = clients.find(x => x.id === id), total = ds.reduce((a, d) => a + totaux(d).ht, 0);
+      const c = clients.find(x => x.id === id), total = ds.reduce((a, d) => a + totaux(d).ttc, 0);
       const dep = depenses.filter(x => x.client_id === id).reduce((a, x) => a + (Number(x.montant) || 0), 0);
       const e = etatPaiements(montants.filter(x => x.client_id === id), total, ds[0].acompte_pct);
       return `<a class="ligne-chantier" href="#/client/${id}?carnet=1">${ds.map(d => `<i data-pv-fini="${d.id}"></i>`).join("")}
@@ -238,7 +238,7 @@ function ajouterDepenseHors() {
 function ligneDoc(d) {
   return `<a class="ligne-liste" href="#/document/${d.id}">
     <div><b>${esc(d.numero)}</b><small>${esc(nomClient(d.client))} · ${dateFr(d.date)}</small></div>
-    <div class="droite"><div class="montant">${eur(totaux(d).ht)} €</div><span class="badge ${esc(d.statut)}">${esc(libelleStatut(d.type, d.statut))}</span></div></a>`;
+    <div class="droite"><div class="montant">${eur(totaux(d).ttc)} €</div><span class="badge ${esc(d.statut)}">${esc(libelleStatut(d.type, d.statut))}</span></div></a>`;
 }
 
 /* =================== Liste des documents =================== */
@@ -353,6 +353,7 @@ async function vueDocument(id, type, params) {
               <div><label>Qté</label><input type="number" step="0.01" inputmode="decimal" value="${esc(l.qte)}" data-l="${i}.${j}" data-k="qte"></div>
               <div><label>Unité</label><select data-l="${i}.${j}" data-k="unite">${UNITES.map(u => `<option ${u === l.unite ? "selected" : ""}>${u}</option>`).join("")}</select></div>
               <div><label>PU HT €</label><input type="number" step="0.01" inputmode="decimal" value="${esc(l.pu)}" data-l="${i}.${j}" data-k="pu"></div>
+              ${l.tva != null && l.tva !== "" ? `<div><label>TVA</label><select data-l="${i}.${j}" data-k="tva">${TAUX_TVA.map(r => `<option value="${r}" ${Number(l.tva) === r ? "selected" : ""}>${tauxTxt(r)}</option>`).join("")}</select></div>` : ""}
               <button class="icone" data-suppr-ligne="${i}.${j}" aria-label="Supprimer la ligne">${ICO.poubelle}</button>
             </div>
             <div class="tot" data-tl="${i}.${j}"></div>
@@ -364,6 +365,8 @@ async function vueDocument(id, type, params) {
       </div>`).join("");
   };
 
+  // un document neuf, ou qui porte déjà la TVA ; jamais un ancien document émis sans TVA
+  const doitTVA = () => !d.id || avecTVA(d);
   const majTotal = () => {
     const t = totaux(d);
     d.sections.forEach((s, i) => {
@@ -371,10 +374,11 @@ async function vueDocument(id, type, params) {
       const el = vue.querySelector(`[data-st="${i}"]`); if (el) el.textContent = eur(st) + " €";
       s.lignes.forEach((l, j) => { const e = vue.querySelector(`[data-tl="${i}.${j}"]`); if (e) e.textContent = eur((Number(l.qte) || 0) * (Number(l.pu) || 0)) + " €"; });
     });
-    document.getElementById("total").textContent = eur(estDevis ? t.ht : t.reste) + " €";
-    document.getElementById("sousTotal").textContent = estDevis
+    document.getElementById("total").textContent = eur(estDevis ? t.ttc : t.reste) + " €" + (t.avecTVA && estDevis ? " TTC" : "");
+    const detailTVA = t.avecTVA ? `HT ${eur(t.ht)} € · ` + t.tva.map(([r, v]) => `TVA ${tauxTxt(r)} ${eur(v)} €`).join(" · ") : "";
+    document.getElementById("sousTotal").textContent = [detailTVA, estDevis
       ? (Number(d.acompte_pct) ? `Acompte ${d.acompte_pct} % : ${eur(t.acompte)} €` : "")
-      : (t.regle ? `Total ${eur(t.ht)} € · réglé ${eur(t.regle)} €` : "");
+      : (t.regle ? `Total ${eur(t.ttc)} € · réglé ${eur(t.regle)} €` : "")].filter(Boolean).join(" · ");
   };
 
   const lier = () => {
@@ -390,11 +394,13 @@ async function vueDocument(id, type, params) {
       if (t.dataset.l) { const [i, j] = t.dataset.l.split(".").map(Number); const k = t.dataset.k; d.sections[i].lignes[j][k] = (k === "qte" || k === "pu") ? Number(t.value) : t.value; }
       modifie = true; majTotal();
     };
-    document.getElementById("lots").onchange = e => { const t = e.target; if (t.dataset.k === "unite") { const [i, j] = t.dataset.l.split(".").map(Number); d.sections[i].lignes[j].unite = t.value; modifie = true; } };
+    document.getElementById("lots").onchange = e => { const t = e.target;
+      if (t.dataset.k === "unite") { const [i, j] = t.dataset.l.split(".").map(Number); d.sections[i].lignes[j].unite = t.value; modifie = true; }
+      if (t.dataset.k === "tva") { const [i, j] = t.dataset.l.split(".").map(Number); d.sections[i].lignes[j].tva = Number(t.value); modifie = true; majTotal(); } };
     document.getElementById("lots").onclick = async e => {
       const b = e.target.closest("button"); if (!b) return;
-      if (b.dataset.libre !== undefined) { d.sections[b.dataset.libre].lignes.push({ designation: "", qte: 1, unite: "presta", pu: 0 }); }
-      else if (b.dataset.catalogue !== undefined) { return choisirPrestation(p => { ajouterPrestation(d, p, Number(b.dataset.catalogue)); modifie = true; dessinerLots(); majTotal(); }); }
+      if (b.dataset.libre !== undefined) { d.sections[b.dataset.libre].lignes.push({ designation: "", qte: 1, unite: "presta", pu: 0 }); if (doitTVA()) poserTVA(d, P); }
+      else if (b.dataset.catalogue !== undefined) { return choisirPrestation(p => { ajouterPrestation(d, p, Number(b.dataset.catalogue)); if (doitTVA()) poserTVA(d, P); modifie = true; dessinerLots(); majTotal(); }); }
       else if (b.dataset.supprLigne) { const [i, j] = b.dataset.supprLigne.split(".").map(Number); d.sections[i].lignes.splice(j, 1); }
       else if (b.dataset.supprLot !== undefined) { if (d.sections[b.dataset.supprLot].lignes.length && !(await confirmer("Supprimer ce lot et ses lignes ?", "Supprimer"))) return; d.sections.splice(b.dataset.supprLot, 1); }
       else if (b.dataset.monter !== undefined) { const i = Number(b.dataset.monter); if (i > 0) [d.sections[i - 1], d.sections[i]] = [d.sections[i], d.sections[i - 1]]; }
@@ -441,6 +447,7 @@ async function vueDocument(id, type, params) {
   };
 
   async function enregistrer() {
+    if (doitTVA()) poserTVA(d, P);
     d.total_ht = totaux(d).ht;
     if (!d.id) { const n = await enregistrerNouveau(d); Object.assign(d, n); history.replaceState(null, "", "#/document/" + d.id); }
     else if (modifie) await db.enregistrer("documents", d);
@@ -450,6 +457,7 @@ async function vueDocument(id, type, params) {
 }
 
 async function enregistrerNouveau(doc) {
+  poserTVA(doc, P); // tout nouveau document suit le régime de TVA des réglages
   doc.total_ht = totaux(doc).ht;
   const n = await db.enregistrer("documents", doc);
   if (doc.type === "devis") P.prochain_devis = Number(P.prochain_devis) + 1; else P.prochain_facture = Number(P.prochain_facture) + 1;
@@ -750,7 +758,8 @@ function vuePlus() {
 
 const CHAMPS_P = [
   ["Entreprise", [["entreprise", "Nom"], ["forme", "Forme juridique"], ["adresse", "Adresse"], ["cp", "Code postal"], ["ville", "Ville"], ["tel", "Téléphone"], ["email", "E-mail"], ["site", "Site"]]],
-  ["Mentions légales", [["siret", "SIRET"], ["ape", "Code APE"], ["tva_intra", "N° TVA"], ["mention_tva", "Mention TVA"]]],
+  ["Mentions légales", [["siret", "SIRET"], ["ape", "Code APE"], ["tva_intra", "N° TVA"]]],
+  ["TVA", [["tva_taux", "Taux de TVA par défaut (%)", "number"]]],
   ["Paiement", [["iban", "IBAN"], ["bic", "BIC"], ["titulaire", "Titulaire du compte"], ["moyen_paiement", "Moyen de paiement"], ["acompte_pct", "Acompte par défaut (%)", "number"], ["validite_jours", "Validité des devis (jours)", "number"], ["echeance_jours", "Échéance (jours)", "number"]]],
   ["Numérotation", [["prochain_devis", "Prochain n° de devis", "number"], ["prochain_facture", "Prochain n° de facture", "number"]]],
   ["Chantiers", [["taux_horaire", "Coût d'une heure de travail (€)", "number"], ["lien_avis", "Lien pour laisser un avis Google"]]]
@@ -760,6 +769,11 @@ function vueReglages() {
     <div class="entete"><h1>Réglages</h1></div>
     <form id="fr" class="carte">
       ${CHAMPS_P.map(([titre, champs]) => `<fieldset><legend>${titre}</legend>${champs.map(([k, l, t]) => `<div class="champ"><label>${l}</label><input type="${t || "text"}" name="${k}" value="${esc(P[k])}"></div>`).join("")}</fieldset>`).join("")}
+      <fieldset><legend>Régime de TVA</legend>
+        <div class="champ"><label>Vos devis et factures</label><select name="regime_tva"><option value="tva" ${P.regime_tva !== "franchise" ? "selected" : ""}>Avec TVA (société, SASU…)</option><option value="franchise" ${P.regime_tva === "franchise" ? "selected" : ""}>Sans TVA (franchise, art. 293 B)</option></select></div>
+        <div class="champ"><label>Mention TVA à taux réduit (attestation du client, sur le devis signé)</label><textarea name="mention_attestation" rows="5">${esc(P.mention_attestation)}</textarea></div>
+        <div class="champ"><label>Mention si sans TVA</label><input type="text" name="mention_tva" value="${esc(P.mention_tva)}"></div>
+      </fieldset>
       <fieldset><legend>Textes des documents</legend>
         <div class="champ"><label>Conditions générales (devis)</label><textarea name="conditions" rows="8">${esc(P.conditions)}</textarea></div>
         <div class="champ"><label>Conditions de paiement (factures)</label><textarea name="penalites" rows="4">${esc(P.penalites)}</textarea></div>
@@ -769,7 +783,7 @@ function vueReglages() {
   document.getElementById("fr").onsubmit = async e => {
     e.preventDefault();
     const o = lireForm(e.target, { ...P });
-    ["acompte_pct", "validite_jours", "echeance_jours", "prochain_devis", "prochain_facture", "taux_horaire"].forEach(k => { o[k] = Number(o[k]) || 0; });
+    ["acompte_pct", "validite_jours", "echeance_jours", "prochain_devis", "prochain_facture", "taux_horaire", "tva_taux"].forEach(k => { o[k] = Number(o[k]) || 0; });
     try { await db.enregistrerParametres(o); P = o; toast("Réglages enregistrés ✓"); } catch (er) { erreur(er); }
   };
 }

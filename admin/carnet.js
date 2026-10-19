@@ -2,6 +2,7 @@
 // (avant, pendant, après les travaux) ; image « avant / après » pour les réseaux.
 
 import { OBJETS_RDV, carteRdv, lierRdv } from "./agenda.js";
+import { totaux } from "./pdf.js";
 
 const ETAPES = { avant: "Avant", pendant: "Pendant", apres: "Après" };
 const TYPES = {
@@ -62,10 +63,11 @@ async function partagerFichier(blob, nom) {
 }
 
 export async function monterCarnet(el, { db, client, P = {}, toast, esc, erreur, envoyerMessage }) {
-  let devisSignes = 0, acompte = Number(P.acompte_pct) || 30;
+  let devisSignes = 0, devisTTC = 0, acompte = Number(P.acompte_pct) || 30;
   try {
     const signes = (await db.lister("documents")).filter(d => d.client_id === client.id && d.type === "devis" && d.statut === "signe");
-    devisSignes = signes.reduce((a, d) => a + (Number(d.total_ht) || 0), 0);
+    devisSignes = signes.reduce((a, d) => a + (Number(d.total_ht) || 0), 0); // la marge se calcule sur le HT
+    devisTTC = signes.reduce((a, d) => a + totaux(d).ttc, 0); // le client paie le TTC
     if (signes[0]?.acompte_pct) acompte = Number(signes[0].acompte_pct);
   } catch { /* pas grave */ }
   let etape = "pendant", filtre = "tout", saisie = null, lignes = [], urls = {}, enCours = 0, choixMontage = null;
@@ -145,13 +147,13 @@ export async function monterCarnet(el, { db, client, P = {}, toast, esc, erreur,
       ${devisSignes
         ? `<button type="button" class="reste-carnet" data-filtre="depense"><span>${Number(P.taux_horaire) ? "Marge du chantier" : "Reste après dépenses"}<small>Devis signés ${eur(devisSignes)} €, moins ce que coûte le chantier</small></span><b>${eur(devisSignes - depenses - heures * (Number(P.taux_horaire) || 0))} €</b></button>`
         : `<p class="gris" style="font-size:13px;margin:-2px 0 12px">Le reste après dépenses s'affiche ici dès qu'un devis de ce client est signé.</p>`}
-      ${devisSignes ? (() => { const e = etatPaiements(tout, devisSignes, acompte); return `<div class="carte paiements-carnet" style="margin-bottom:12px">
+      ${devisSignes ? (() => { const e = etatPaiements(tout, devisTTC, acompte); return `<div class="carte paiements-carnet" style="margin-bottom:12px">
         <b>Paiements du client</b>
         <div class="palette" style="margin:8px 0 6px">${AVANCEMENTS(acompte).map(([k, n, p]) => `<button type="button" class="btn ${e.pct === p ? "" : "discret"} petit-btn" data-avancement="${p}">${n} · ${p} %</button>`).join("")}</div>
-        <div class="ligne-bilan"><span>Dû à ce stade (${e.pct} % de ${eur(devisSignes)} €)</span><span>${eur(e.du)} €</span></div>
+        <div class="ligne-bilan"><span>Dû à ce stade (${e.pct} % de ${eur(devisTTC)} €)</span><span>${eur(e.du)} €</span></div>
         <div class="ligne-bilan"><span>Déjà versé</span><span>${eur(e.verse)} €</span></div>
         <div class="ligne-bilan total ${e.aReclamer ? "a-reclamer" : ""}"><span>${e.aReclamer ? "À réclamer maintenant" : "✓ Le client est à jour"}</span><span>${e.aReclamer ? eur(e.aReclamer) + " €" : ""}</span></div>
-        <div class="ligne-bilan"><span>Reste à payer sur le devis</span><span>${eur(Math.max(0, devisSignes - e.verse))} €</span></div>
+        <div class="ligne-bilan"><span>Reste à payer sur le devis</span><span>${eur(Math.max(0, devisTTC - e.verse))} €</span></div>
         <div class="actions-doc" style="margin:8px 0 0"><button type="button" class="btn clair petit-btn" data-saisie="paiement">+ Paiement reçu</button></div></div>`; })() : ""}
       ${filtre === "depense" || filtre === "heures" ? bilan(tout) : ""}
       ${avants.length && apres.length ? `<button type="button" class="btn clair petit-btn" id="cMontage" style="margin-bottom:10px">Créer une image avant / après</button>` : ""}

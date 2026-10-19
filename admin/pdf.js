@@ -1,4 +1,5 @@
 // Génération des devis et factures en PDF (jsPDF + autoTable), sur le modèle des devis KA Rénovation.
+import { PARAMETRES_DEFAUT } from "./donnees.js";
 
 const ENCRE = [27, 26, 24], GRIS = [109, 103, 95], PIERRE = [239, 235, 229], SABLE = [217, 208, 195], FILET = [200, 20, 26];
 
@@ -15,13 +16,36 @@ async function logo() {
   return logoCache;
 }
 
+export const TAUX_TVA = [10, 20, 5.5];
+const arrondi = n => Math.round(n * 100) / 100;
+export const tauxTxt = r => String(r).replace(".", ",") + " %";
+// Un document porte la TVA dès qu'une de ses lignes a un taux. Les anciens documents (franchise 293 B) n'en ont pas.
+export const avecTVA = doc => (doc.sections || []).some(s => (s.lignes || []).some(l => l.tva != null && l.tva !== ""));
+// Donne le taux par défaut aux lignes qui n'en ont pas (nouveaux documents, nouvelles lignes).
+export function poserTVA(doc, p) {
+  if (!p || p.regime_tva === "franchise") return doc;
+  const taux = Number(p.tva_taux) || 10;
+  for (const s of doc.sections || []) for (const l of s.lignes || []) if (l.tva == null || l.tva === "") l.tva = taux;
+  return doc;
+}
 export function totaux(doc) {
-  let ht = 0;
-  for (const s of doc.sections || []) for (const l of s.lignes || []) ht += (Number(l.qte) || 0) * (Number(l.pu) || 0);
-  ht = Math.round(ht * 100) / 100;
-  const acompte = Math.round(ht * (Number(doc.acompte_pct) || 0)) / 100;
+  let ht = 0; const parTaux = {};
+  for (const s of doc.sections || []) for (const l of s.lignes || []) {
+    const m = (Number(l.qte) || 0) * (Number(l.pu) || 0); ht += m;
+    if (l.tva != null && l.tva !== "") { const r = Number(l.tva); parTaux[r] = (parTaux[r] || 0) + m * r / 100; }
+  }
+  ht = arrondi(ht);
+  const tva = Object.entries(parTaux).map(([r, v]) => [Number(r), arrondi(v)]).sort((a, b) => b[0] - a[0]);
+  const ttc = arrondi(ht + tva.reduce((a, [, v]) => a + v, 0));
+  const acompte = Math.round(ttc * (Number(doc.acompte_pct) || 0)) / 100;
   const regle = Number(doc.deja_regle) || 0;
-  return { ht, acompte, regle, reste: Math.round((ht - regle) * 100) / 100 };
+  return { ht, tva, ttc, avecTVA: tva.length > 0, acompte, regle, reste: arrondi(ttc - regle) };
+}
+// La mention à imprimer : franchise pour les anciens documents, attestation du client quand un taux réduit est appliqué.
+export function mentionTVA(doc, p) {
+  if (!avecTVA(doc)) return p.mention_tva || "";
+  const reduit = totaux(doc).tva.some(([r]) => r < 20);
+  return reduit ? (p.mention_attestation || PARAMETRES_DEFAUT.mention_attestation) : "";
 }
 
 export async function creerPDF(d, p) {
@@ -94,7 +118,7 @@ export async function creerPDF(d, p) {
     corps[corps.length - 1].section = true;
     (s.lignes || []).forEach(l => {
       const txt = propre(l.designation) + (l.description ? "\n" + propre(l.description) : "");
-      corps.push(["", txt, `${String(l.qte).replace(".", ",")} ${l.unite || ""}`.trim(), eur(l.pu), eur((Number(l.qte) || 0) * (Number(l.pu) || 0)), "0,0 %"]);
+      corps.push(["", txt, `${String(l.qte).replace(".", ",")} ${l.unite || ""}`.trim(), eur(l.pu), eur((Number(l.qte) || 0) * (Number(l.pu) || 0)), l.tva != null && l.tva !== "" ? tauxTxt(l.tva) : "0 %"]);
     });
   });
   pdf.autoTable({
@@ -118,7 +142,8 @@ export async function creerPDF(d, p) {
 
   // --- Totaux
   const lignesTot = [["Total HT", eur(t.ht) + " €"]];
-  if (estDevis) { lignesTot.push(["Net à payer", eur(t.ht) + " €", true]); if (Number(d.acompte_pct)) lignesTot.push([`Acompte (${d.acompte_pct} %)`, eur(t.acompte) + " €"]); }
+  if (t.avecTVA) { t.tva.forEach(([r, v]) => lignesTot.push([`TVA ${tauxTxt(r)}`, eur(v) + " €"])); lignesTot.push(["Total TTC", eur(t.ttc) + " €"]); }
+  if (estDevis) { lignesTot.push([t.avecTVA ? "Net à payer TTC" : "Net à payer", eur(t.ttc) + " €", true]); if (Number(d.acompte_pct)) lignesTot.push([`Acompte (${d.acompte_pct} %)`, eur(t.acompte) + " €"]); }
   else { if (t.regle) lignesTot.push(["Déjà réglé", eur(t.regle) + " €"]); lignesTot.push(["Reste à payer", eur(t.reste) + " €", true]); }
   place(lignesTot.length * 7 + 12);
   const tx = 122;
@@ -128,7 +153,8 @@ export async function creerPDF(d, p) {
     pdf.text(a, tx, y + 3 + i * 7); pdf.text(b, W - M, y + 3 + i * 7, { align: "right" });
   });
   pdf.setFont("helvetica", "normal").setFontSize(8.5).setTextColor(...GRIS);
-  const mentions = [`Mention : ${propre(p.mention_tva)}`, `Moyen de paiement : ${propre(p.moyen_paiement)} · Échéance : ${p.echeance_jours} jours`];
+  const mTVA = mentionTVA(d, p);
+  const mentions = [mTVA ? `${t.avecTVA ? "Attestation du client (TVA à taux réduit)" : "Mention"} : ${propre(mTVA)}` : "", `Moyen de paiement : ${propre(p.moyen_paiement)} · Échéance : ${p.echeance_jours} jours`];
   if (!estDevis && p.iban) mentions.push(`IBAN : ${propre(p.iban)}${p.bic ? "  ·  BIC : " + propre(p.bic) : ""}`, p.titulaire ? `Titulaire : ${propre(p.titulaire)}` : "");
   let ym = y;
   mentions.filter(Boolean).forEach(m => { const l = pdf.splitTextToSize(m, tx - M - 6); pdf.text(l, M, ym); ym += l.length * 3.8 + 1.2; });
@@ -154,7 +180,7 @@ export async function creerPDF(d, p) {
     pdf.setFont("helvetica", "bold").setFontSize(9).setTextColor(...ENCRE).text("Signature du client", sx + 4, y + 6);
     pdf.setFont("helvetica", "normal").setFontSize(7.8).setTextColor(...GRIS);
     pdf.text(pdf.splitTextToSize("Datée et précédée de la mention « Reçu avant l'exécution des travaux, bon pour accord pour un net à payer de", sw - 8), sx + 4, y + 11);
-    pdf.setFont("helvetica", "bold").setFontSize(9).setTextColor(...ENCRE).text(`${eur(t.ht)} € »`, sx + 4, y + 20.5);
+    pdf.setFont("helvetica", "bold").setFontSize(9).setTextColor(...ENCRE).text(`${eur(t.ttc)} €${t.avecTVA ? " TTC" : ""} »`, sx + 4, y + 20.5);
     if (d.signe_le) {
       const quand = new Date(d.signe_le);
       pdf.setFont("helvetica", "normal").setFontSize(7.8).setTextColor(...GRIS)

@@ -62,7 +62,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script type="module">
-  import { telechargerPDF, totaux, eur } from "../admin/pdf.js";
+  import { telechargerPDF, totaux, eur, mentionTVA, tauxTxt } from "../admin/pdf.js";
   const BASE = "https://bafrmnkorenfavwnvsyh.supabase.co", CLE = "sb_publishable_FBsYL_tD0y-F-2Bt-7KZzg_Z4UIpXpK";
   const MAIL = "https://formsubmit.co/ajax/karenovation@outlook.fr";
   const vue = document.getElementById("vue");
@@ -88,8 +88,9 @@
       <div class="carte">
         ${(d.sections || []).filter(s => s.lignes?.length).map(s => `<div class="lot"><h3>${esc(s.titre)}</h3>
           ${s.lignes.map(l => `<div class="ligne"><div>${esc(l.designation).replace(/\n/g, "<br>")}<small>${esc(l.qte)} ${esc(l.unite || "")} × ${eur(l.pu)} €</small></div><div class="m">${eur((Number(l.qte) || 0) * (Number(l.pu) || 0))} €</div></div>`).join("")}</div>`).join("")}
-        <div class="total"><span>Net à payer</span><b>${eur(t.ht)} €</b></div>
-        <p class="gris" style="font-size:13px;margin-top:4px">${esc(p.mention_tva || "")}${t.acompte ? ` · Acompte à la signature : ${eur(t.acompte)} € (${esc(d.acompte_pct)} %)` : ""}</p>
+        ${t.avecTVA ? `<div class="ligne"><div>Total HT</div><div class="m">${eur(t.ht)} €</div></div>${t.tva.map(([r, v]) => `<div class="ligne"><div>TVA ${tauxTxt(r)}</div><div class="m">${eur(v)} €</div></div>`).join("")}` : ""}
+        <div class="total"><span>Net à payer${t.avecTVA ? " TTC" : ""}</span><b>${eur(t.ttc)} €</b></div>
+        <p class="gris" style="font-size:13px;margin-top:4px">${t.avecTVA ? "" : esc(p.mention_tva || "")}${t.acompte ? `${t.avecTVA ? "" : " · "}Acompte à la signature : ${eur(t.acompte)} € (${esc(d.acompte_pct)} %)` : ""}</p>
         <div class="actions"><button class="btn clair" id="pdf">Télécharger le PDF</button></div>
       </div>
       ${d.notes ? `<div class="carte"><h2>Note</h2><p style="white-space:pre-line">${esc(d.notes)}</p></div>` : ""}
@@ -108,7 +109,7 @@
           if (!r.ok) throw new Error("deja");
           fetch(MAIL, { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" },
             body: JSON.stringify({ _subject: `Devis ${d.numero} signé en ligne`, _template: "table", _captcha: "false",
-              Devis: d.numero, Client: nom, "Signé par": f.nom.value.trim(), Montant: `${eur(t.ht)} €` }) }).catch(() => {});
+              Devis: d.numero, Client: nom, "Signé par": f.nom.value.trim(), Montant: `${eur(t.ttc)} €${t.avecTVA ? " TTC" : ""}` }) }).catch(() => {});
           await charger();
           window.scrollTo({ top: document.getElementById("zone-signature").offsetTop - 20, behavior: "smooth" });
         } catch (er) {
@@ -128,7 +129,8 @@
     if (d.statut === "refuse") return `<div class="carte" id="zone-signature"><p class="gris">Ce devis n'est plus à signer. Pour toute question : 07 63 14 76 27.</p></div>`;
     return `<form class="carte" id="signer">
       <h2 id="zone-signature">Bon pour accord</h2>
-      <p class="gris" style="font-size:14px">Reçu avant l'exécution des travaux, bon pour accord pour un net à payer de <b style="color:var(--encre)">${eur(t.ht)} €</b>.</p>
+      <p class="gris" style="font-size:14px">Reçu avant l'exécution des travaux, bon pour accord pour un net à payer de <b style="color:var(--encre)">${eur(t.ttc)} €${t.avecTVA ? " TTC" : ""}</b>.</p>
+      ${t.avecTVA && mentionTVA(d, p) ? `<p class="gris" style="font-size:13px;margin-top:10px">${esc(mentionTVA(d, p))}</p>` : ""}
       <label for="nom">Votre nom et prénom</label>
       <input type="text" id="nom" name="nom" autocomplete="name" maxlength="120" required>
       <label class="case"><input type="checkbox" name="accord">J'ai lu le devis et les conditions générales ci-dessous, et je les accepte.</label>

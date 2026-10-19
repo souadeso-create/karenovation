@@ -13,6 +13,11 @@ export const PARAMETRES_DEFAUT = {
   ape: "74.10Z",
   tva_intra: "FR15 928 891 886",
   mention_tva: "TVA non applicable, article 293 B du Code général des impôts",
+  // SASU : la TVA s'applique. 10 % pour la rénovation d'un logement achevé depuis plus de 2 ans ;
+  // depuis le 16/02/2025, l'attestation du client est remplacée par cette mention sur le devis signé.
+  regime_tva: "tva",
+  tva_taux: 10,
+  mention_attestation: "En qualité de preneur de la prestation, j'atteste que les travaux réalisés se rapportent à des locaux à usage d'habitation achevés depuis plus de deux ans et respectent les conditions prévues par les articles 279-0 bis et 278-0 bis A du Code général des impôts, et notamment que les travaux effectués sur une période de deux ans au plus n'ont ni concouru à la production d'un immeuble neuf au sens du 2° du 2 du I de l'article 257 du Code général des impôts, ni conduit à augmenter la surface de plancher des locaux existants de plus de 10 %.",
   iban: "",
   bic: "",
   titulaire: "",
