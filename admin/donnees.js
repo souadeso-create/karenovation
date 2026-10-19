@@ -68,10 +68,44 @@ export const PRESTATIONS_DEFAUT = [
   ["Finitions", "Nettoyage fin de chantier", "presta", 90]
 ];
 
+// Prestations courantes ajoutées le 19/10/2026 (prix HT, TVA 10 %).
+export const PRESTATIONS_SUITE = [
+  ["Rénovation complète", "Rénovation des toilettes clé en main : dépose, pose du WC (suspendu ou au sol), coffrage placo hydro, carrelage ou faïence, peinture, nettoyage. Carrelage, WC et lave-mains fournis par le client", "forfait", 1090],
+  ["Rénovation complète", "Remplacement de baignoire par une douche : dépose de la baignoire, reprise de l'évacuation, pose du receveur extra-plat, étanchéité, faïence de la zone douche, pose de la paroi et de la robinetterie. Receveur, paroi et faïence fournis par le client", "forfait", 1362.73],
+  ["Plomberie", "Pose receveur de douche extra-plat (hors fourniture)", "presta", 350],
+  ["Plomberie", "Pose paroi de douche fixe ou porte de douche", "presta", 180],
+  ["Plomberie", "Pose colonne de douche ou mitigeur thermostatique", "presta", 120],
+  ["Plomberie", "Pose baignoire avec raccordements", "presta", 450],
+  ["Plomberie", "Pose WC au sol", "presta", 150],
+  ["Plomberie", "Pose lave-mains avec raccordements", "presta", 180],
+  ["Plomberie", "Pose meuble simple vasque et robinetterie", "presta", 180],
+  ["Électricité", "Création d'une prise ou d'un point lumineux", "u", 90],
+  ["Électricité", "Pose plafonnier ou applique", "u", 40],
+  ["Électricité", "Pose sèche-serviettes électrique avec raccordement", "presta", 120],
+  ["Placo / Étanchéité / Sol", "Cloison placo hydro (ossature, plaques, bandes)", "m2", 55],
+  ["Placo / Étanchéité / Sol", "Doublage placo avec isolant", "m2", 60],
+  ["Placo / Étanchéité / Sol", "Faux plafond placo", "m2", 45],
+  ["Placo / Étanchéité / Sol", "Coffrage placo (tuyaux, bâti WC)", "presta", 180],
+  ["Placo / Étanchéité / Sol", "Pose sol PVC (lames ou rouleau)", "m2", 25],
+  ["Pose carrelage", "Pose carrelage sol format standard, colle et joints inclus", "m2", 45],
+  ["Pose carrelage", "Pose faïence murale format standard, colle et joints inclus", "m2", 45],
+  ["Pose carrelage", "Pose mosaïque, colle et joints inclus", "m2", 70],
+  ["Pose carrelage", "Pose plinthes carrelage", "ml", 12],
+  ["Pose carrelage", "Réfection des joints de carrelage", "m2", 25],
+  ["Pose carrelage", "Joints silicone autour de la douche ou de la baignoire", "presta", 60],
+  ["Menuiserie / Installations", "Pose bloc-porte battant", "presta", 180],
+  ["Menuiserie / Installations", "Pose verrière d'intérieur (hors fourniture)", "presta", 400],
+  ["Menuiserie / Installations", "Pose miroir, accessoires et rangements muraux", "presta", 60],
+  ["Finitions", "Enduit et ratissage des murs", "m2", 15],
+  ["Finitions", "Peinture murs, deux couches", "m2", 18]
+];
+PRESTATIONS_DEFAUT.push(...PRESTATIONS_SUITE);
+
 // Prestations ajoutées après coup : versées une seule fois dans une base déjà remplie.
 // Celles que l'artisan a déjà (même désignation, même archivées) ne sont pas ajoutées deux fois.
 export const AJOUTS_PRESTATIONS = [
-  { cle: "forfaits-taille-2026-10", lignes: PRESTATIONS_DEFAUT.filter(p => p[0] === "Rénovation complète") }
+  { cle: "forfaits-taille-2026-10", lignes: PRESTATIONS_DEFAUT.filter(p => p[0] === "Rénovation complète" && !PRESTATIONS_SUITE.includes(p)) },
+  { cle: "prestations-suite-2026-10", lignes: PRESTATIONS_SUITE }
 ];
 
 // Désignations corrigées après coup : une ligne restée telle quelle chez l'artisan prend le nouveau texte.

@@ -498,12 +498,15 @@ async function choisirClient(rappel) {
   f.el.querySelector("#nvClient").onclick = () => { f.fermer(); formulaireClient({}, c => rappel(c)); };
 }
 
+/* Les forfaits de rénovation complète passent en tête du catalogue. */
+const enTete = cats => [...cats.filter(c => c === "Rénovation complète"), ...cats.filter(c => c !== "Rénovation complète")];
+
 async function choisirPrestation(rappel) {
   const ps = (await db.lister("prestations", { ordre: "created_at", desc: false })).filter(p => !p.archive);
   const f = fenetre("Mes prestations", `<input class="recherche" type="search" placeholder="Rechercher…" id="rp"><div id="lp"></div>`);
   const aff = q => {
     const l = ps.filter(p => !q || `${p.designation} ${p.categorie}`.toLowerCase().includes(q.toLowerCase()));
-    const cats = [...new Set(l.map(p => p.categorie || "Autres"))];
+    const cats = enTete([...new Set(l.map(p => p.categorie || "Autres"))]);
     f.el.querySelector("#lp").innerHTML = cats.map(cat => `<div class="cat-titre">${esc(cat)}</div>` +
       l.filter(p => (p.categorie || "Autres") === cat).map(p => `<button class="choix" data-id="${p.id}"><span>${esc(p.designation)}</span><span class="gris" style="white-space:nowrap">${eur(p.prix_ht)} € / ${esc(p.unite)}</span></button>`).join("")).join("")
       || '<p class="vide">Aucune prestation.</p>';
@@ -672,7 +675,7 @@ async function vueClient(id, params) {
 /* =================== Prestations =================== */
 async function vuePrestations() {
   const ps = (await db.lister("prestations", { ordre: "created_at", desc: false })).filter(p => !p.archive);
-  const cats = [...new Set(ps.map(p => p.categorie || "Autres"))];
+  const cats = enTete([...new Set(ps.map(p => p.categorie || "Autres"))]);
   vue.innerHTML = `
     <div class="entete"><div><h1>Prestations</h1><p class="gris">Votre catalogue de prix, utilisable dans chaque devis.</p></div><button class="btn" id="nv">${ICO.plus}Nouvelle prestation</button></div>
     <input class="recherche" type="search" placeholder="Rechercher…" id="rech">
