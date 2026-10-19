@@ -1,7 +1,7 @@
 // Espace admin KA Rénovation : devis, factures, clients, prestations, simulation 3D.
 import * as db from "./store.js";
 import { UNITES } from "./donnees.js";
-import { telechargerPDF, totaux, eur, poserTVA, avecTVA, TAUX_TVA, tauxTxt } from "./pdf.js";
+import { telechargerPDF, totaux, eur, poserTVA, avecTVA, TAUX_TVA, tauxTxt, avenantDe } from "./pdf.js";
 import { CATEGORIES, etatPaiements } from "./carnet.js";
 import { carteRdv, lierRdv } from "./agenda.js";
 
@@ -34,8 +34,9 @@ let P = null; // paramètres de l'entreprise
 const lienSignature = d => d.jeton ? location.origin + location.pathname.replace(/admin\/.*$/, "") + "devis/?d=" + d.jeton : "";
 const numeroWa = t => { const n = String(t || "").replace(/\D/g, ""); return n.startsWith("0") ? "33" + n.slice(1) : n; };
 const politesse = c => c ? [c.civilite, c.nom].filter(Boolean).join(" ") : "";
-const msgSignature = d => `Bonjour ${politesse(d.client)},\n\nVoici votre devis ${d.numero} de KA Rénovation. Vous pouvez le lire, le télécharger et le signer en ligne ici :\n${lienSignature(d)}\n\nBonne journée,\nKA Rénovation`;
-const msgRelance = d => `Bonjour ${politesse(d.client)},\n\nJe reviens vers vous au sujet du devis ${d.numero}. Il est toujours consultable et à signer en ligne ici :\n${lienSignature(d)}\n\nN'hésitez pas si vous avez des questions.\nKA Rénovation`;
+const quelDoc = d => { const av = avenantDe(d); return av ? `l'avenant n° ${av.n} au devis ${av.devis}` : `le devis ${d.numero}`; };
+const msgSignature = d => `Bonjour ${politesse(d.client)},\n\nVoici ${avenantDe(d) ? quelDoc(d) : `votre devis ${d.numero}`} de KA Rénovation. Vous pouvez le lire, le télécharger et le signer en ligne ici :\n${lienSignature(d)}\n\nBonne journée,\nKA Rénovation`;
+const msgRelance = d => `Bonjour ${politesse(d.client)},\n\nJe reviens vers vous au sujet de ${quelDoc(d)}. Il est toujours consultable et à signer en ligne ici :\n${lienSignature(d)}\n\nN'hésitez pas si vous avez des questions.\nKA Rénovation`;
 const SEPT_JOURS = 7 * 864e5;
 const aRelancer = d => d.type === "devis" && d.statut === "envoye" && !d.signe_le && d.jeton && Date.now() - new Date(d.updated_at || d.created_at) > SEPT_JOURS;
 async function listerDemandes() { try { return await db.lister("demandes"); } catch { return null; } }
@@ -237,7 +238,7 @@ function ajouterDepenseHors() {
 
 function ligneDoc(d) {
   return `<a class="ligne-liste" href="#/document/${d.id}">
-    <div><b>${esc(d.numero)}</b><small>${esc(nomClient(d.client))} · ${dateFr(d.date)}</small></div>
+    <div><b>${esc(d.numero)}</b><small>${avenantDe(d) ? "Avenant · " : ""}${esc(nomClient(d.client))} · ${dateFr(d.date)}</small></div>
     <div class="droite"><div class="montant">${eur(totaux(d).ttc)} €</div><span class="badge ${esc(d.statut)}">${esc(libelleStatut(d.type, d.statut))}</span></div></a>`;
 }
 
@@ -282,11 +283,15 @@ async function vueDocument(id, type, params) {
     d.sections = d.sections?.length ? d.sections : [{ titre: "Travaux", lignes: [] }];
   }
   const estDevis = d.type === "devis";
+  const av = avenantDe(d);
+  // Avenants déjà faits sur ce devis (devis d'origine seulement)
+  const avenants = estDevis && d.id && !av ? (await db.lister("documents", { desc: false }))
+    .filter(x => x.type === "devis" && x.id !== d.id && (x.devis_id === d.id || avenantDe(x)?.devis === d.numero)) : [];
   let modifie = false;
 
   const dessiner = () => {
     vue.innerHTML = `
-      <div class="entete"><div><div class="petit">${estDevis ? "Devis" : "Facture"} ${d.id ? "" : "· nouveau"}</div><h1>${esc(d.numero)}</h1></div>
+      <div class="entete"><div><div class="petit">${av ? `Avenant n° ${av.n} au devis ${esc(av.devis)}` : estDevis ? "Devis" : "Facture"} ${d.id ? "" : "· nouveau"}</div><h1>${esc(d.numero)}</h1></div>
         <select id="statut" style="width:auto">${STATUTS[d.type].map(([v, l]) => `<option value="${v}" ${v === d.statut ? "selected" : ""}>${l}</option>`).join("")}</select></div>
       <div class="deux-col">
         <div>
@@ -315,10 +320,14 @@ async function vueDocument(id, type, params) {
             <button class="btn clair" id="pdf">${ICO.pdf}PDF</button>
             <button class="btn clair" id="partage">${ICO.partage}Envoyer</button>
             ${estDevis && d.id ? `<button class="btn discret" id="versFacture">Transformer en facture</button>` : ""}
-            ${d.id && ((estDevis && d.statut === "signe") || (!estDevis && d.devis_id)) ? `<a class="btn clair" href="#/reception/${estDevis ? d.id : d.devis_id}">PV de fin de chantier</a>` : ""}
+            ${estDevis && d.id && !av && d.statut === "signe" ? `<button class="btn clair" id="avenant">${ICO.plus}Créer un avenant</button>` : ""}
+            ${d.id && !av && ((estDevis && d.statut === "signe") || (!estDevis && d.devis_id)) ? `<a class="btn clair" href="#/reception/${estDevis ? d.id : d.devis_id}">PV de fin de chantier</a>` : ""}
             ${d.id ? `<button class="btn discret" id="dupliquer">Dupliquer</button>` : ""}
             ${d.id && (estDevis || d.statut === "brouillon") ? `<button class="btn danger" id="suppr">${ICO.poubelle}Supprimer</button>` : ""}
           </div>
+          ${avenants.length ? `<div class="carte" style="margin-bottom:12px"><b>Avenants</b>
+            <div class="liste" style="margin-top:8px">${avenants.map(ligneDoc).join("")}</div>
+            <div class="ligne-bilan" style="margin-top:8px"><span>Devis et avenants signés</span><span><b>${eur([d, ...avenants].filter(x => x.statut === "signe").reduce((a, x) => a + totaux(x).ttc, 0))} €</b></span></div></div>` : ""}
           ${estDevis && d.id && d.jeton ? (d.signe_le
             ? `<div class="carte signe-ok"><b>✓ Signé en ligne</b><small>le ${new Date(d.signe_le).toLocaleString("fr-FR", { dateStyle: "long", timeStyle: "short" })} par ${esc(d.signe_nom)}</small></div>`
             : `<div class="carte" style="margin-bottom:12px"><b>Signature en ligne</b><p class="gris" style="font-size:14px;margin:4px 0 12px">Le client reçoit un lien pour lire, télécharger et signer ce devis sur son téléphone.</p>
@@ -433,6 +442,19 @@ async function vueDocument(id, type, params) {
     };
     const cl = document.getElementById("copieLien");
     if (cl) cl.onclick = async () => { await navigator.clipboard.writeText(lienSignature(d)); toast("Lien copié ✓"); };
+    const ave = document.getElementById("avenant");
+    if (ave) ave.onclick = async () => {
+      try {
+        await enregistrer();
+        const n = avenants.reduce((m, x) => Math.max(m, avenantDe(x)?.n || 0), 0) + 1;
+        const a = { type: "devis", numero: `${d.numero}-AV${n}`, date: aujourdhui(), statut: "brouillon", client_id: d.client_id, client: d.client,
+          objet: `Avenant n° ${n}${d.objet ? " - " + d.objet : ""}`, date_debut: null, duree: "", sections: [{ titre: "Travaux supplémentaires", lignes: [] }],
+          acompte_pct: 0, deja_regle: 0, devis_id: d.id, devis_numero: d.numero, devis_date: d.date, notes: "" };
+        poserTVA(a, P); a.total_ht = totaux(a).ht;
+        const r = await db.enregistrer("documents", a); // l'avenant ne prend pas de numéro de devis
+        toast("Avenant créé ✓"); location.hash = "#/document/" + r.id;
+      } catch (e) { erreur(e); }
+    };
     const du = document.getElementById("dupliquer");
     if (du) du.onclick = async () => {
       const copie = { ...JSON.parse(JSON.stringify(d)), id: undefined, created_at: undefined, numero: numeroSuivant(d.type), date: aujourdhui(), statut: "brouillon", devis_id: null, devis_numero: null, devis_date: null };

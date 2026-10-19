@@ -48,11 +48,18 @@ export function mentionTVA(doc, p) {
   return reduit ? (p.mention_attestation || PARAMETRES_DEFAUT.mention_attestation) : "";
 }
 
+/* Un avenant est un devis numéroté comme le devis d'origine suivi de -AV1, -AV2… */
+export function avenantDe(d) {
+  const m = d && d.type === "devis" && /^(.*)-AV(\d+)$/.exec(d.numero || "");
+  return m ? { devis: m[1], n: Number(m[2]) } : null;
+}
+
 export async function creerPDF(d, p) {
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF({ unit: "mm", format: "a4" });
   const W = 210, M = 15, estDevis = d.type === "devis";
-  const titre = estDevis ? "DEVIS" : "FACTURE";
+  const av = avenantDe(d);
+  const titre = av ? "AVENANT" : estDevis ? "DEVIS" : "FACTURE";
   const t = totaux(d);
   const c = d.client || {};
   pdf.setLineHeightFactor(1.25);
@@ -67,6 +74,7 @@ export async function creerPDF(d, p) {
   if (estDevis) {
     const v = new Date(d.date + "T12:00:00"); v.setDate(v.getDate() + (Number(p.validite_jours) || 90));
     pdf.text(`Validité : jusqu'au ${v.toLocaleDateString("fr-FR")}`, 112, y + 5);
+    if (av) pdf.text(`Avenant n° ${av.n} au devis N° ${propre(av.devis)}${d.devis_date ? " du " + dateFr(d.devis_date) : ""}`, 112, y + 10);
   } else {
     const e = new Date(d.date + "T12:00:00"); e.setDate(e.getDate() + (Number(p.echeance_jours) || 30));
     pdf.text(`Échéance : ${e.toLocaleDateString("fr-FR")}`, 112, y + 5);
@@ -194,7 +202,7 @@ export async function creerPDF(d, p) {
   for (let i = 1; i <= n; i++) {
     pdf.setPage(i);
     pdf.setFont("helvetica", "normal").setFontSize(7.5).setTextColor(...GRIS);
-    pdf.text(`${estDevis ? "Devis" : "Facture"} page ${i} / ${n}`, M, 9);
+    pdf.text(`${av ? "Avenant" : estDevis ? "Devis" : "Facture"} page ${i} / ${n}`, M, 9);
     pdf.text(`Numéro : ${propre(d.numero)}`, W - M, 9, { align: "right" });
     pdf.setDrawColor(...SABLE).setLineWidth(.2).line(M, 297 - 19, W - M, 297 - 19);
     pdf.setFontSize(6.8);
@@ -207,7 +215,7 @@ export async function creerPDF(d, p) {
 export function nomFichier(d) {
   const c = d.client || {};
   const nom = [c.nom, c.prenom].filter(Boolean).join("_").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\w-]+/g, "_");
-  return `${d.type === "devis" ? "Devis" : "Facture"}_${nom || "client"}_${d.numero}.pdf`;
+  return `${avenantDe(d) ? "Avenant" : d.type === "devis" ? "Devis" : "Facture"}_${nom || "client"}_${d.numero}.pdf`;
 }
 
 // Télécharge le PDF ; sur téléphone, propose aussi de le partager (WhatsApp, e-mail…).
