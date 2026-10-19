@@ -599,11 +599,17 @@ const MAGASINS = [["Leroy Merlin", q => `https://www.leroymerlin.fr/search?q=${q
 const CLE_VUS = "ka_magasins_vus";
 const vus = (() => { try { return new Set(JSON.parse(localStorage.getItem(CLE_VUS) || "[]")); } catch { return new Set(); } })();
 function noterVu(cle) { vus.add(cle); try { localStorage.setItem(CLE_VUS, JSON.stringify([...vus].slice(-500))); } catch { /* navigateur privé */ } }
+// Appli installée sur Android : la petite fenêtre par-dessus l'appli perd la page quand on la ferme.
+// On passe par le navigateur du téléphone, où les onglets restent ouverts.
+const ANDROID_INSTALLE = /Android/i.test(navigator.userAgent) && matchMedia("(display-mode: standalone)").matches;
+const lienMagasin = url => ANDROID_INSTALLE
+  ? `intent://${url.replace(/^https:\/\//, "")}#Intent;scheme=https;S.browser_fallback_url=${encodeURIComponent(url)};end`
+  : url;
 function magasins(terme) {
   const t = terme.replace(/×/g, "x").replace(/[()]/g, "").replace(/ seule?(?![a-z])/g, "").replace(/ +/g, " ").trim();
   return `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${MAGASINS.map(([nom, url]) => {
     const cle = t + "|" + nom, vu = vus.has(cle);
-    return `<a href="${url(encodeURIComponent(t))}" target="_blank" rel="noopener" data-vu="${cle.replace(/"/g, "&quot;")}" style="font-size:12px;border:1px solid ${vu ? "var(--ok)" : "var(--sable)"};border-radius:999px;padding:3px 10px;text-decoration:none;color:${vu ? "var(--ok)" : "inherit"};background:var(--blanc)">${vu ? "✓ " : ""}${nom}</a>`;
+    return `<a href="${lienMagasin(url(encodeURIComponent(t)))}" ${ANDROID_INSTALLE ? "" : 'target="_blank" rel="noopener"'} data-vu="${cle.replace(/"/g, "&quot;")}" style="font-size:12px;border:1px solid ${vu ? "var(--ok)" : "var(--sable)"};border-radius:999px;padding:3px 10px;text-decoration:none;color:${vu ? "var(--ok)" : "inherit"};background:var(--blanc)">${vu ? "✓ " : ""}${nom}</a>`;
   }).join("")}</div>`;
 }
 
