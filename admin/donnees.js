@@ -117,12 +117,24 @@ export const PRESTATIONS_3D = [
 ];
 PRESTATIONS_DEFAUT.push(...PRESTATIONS_3D);
 
+// Forfaits ajoutés le 19/10/2026 (prix HT, TVA 10 % : 1 999, 1 299, 2 299, 4 950, 899 et 799 € TTC).
+export const FORFAITS_SUITE = [
+  ["Rénovation complète", "Douche à l'italienne clé en main : dépose de l'ancienne douche, reprise de l'évacuation, receveur extra-plat ou douche carrelée, étanchéité SPEC, faïence de la zone douche, pose de la paroi et de la colonne, nettoyage. Carrelage, sanitaires et meubles fournis par le client", "forfait", 1817.27],
+  ["Rénovation complète", "Rafraîchissement de salle de bain sans travaux de plomberie : remplacement du meuble vasque et de la robinetterie, miroir, joints refaits, peinture murs et plafond, nettoyage. Carrelage, sanitaires et meubles fournis par le client", "forfait", 1180.91],
+  ["Rénovation complète", "Salle de bain adaptée senior : baignoire remplacée par une douche de plain-pied, sol antidérapant, barres de maintien, siège de douche rabattable, nettoyage. Carrelage, sanitaires et meubles fournis par le client", "forfait", 2090],
+  ["Rénovation complète", "Création d'une salle d'eau (combles, sous-sol, chambre) : cloisons placo hydro, arrivées d'eau et évacuations, électricité, étanchéité, douche, meuble vasque, WC, carrelage sol et murs, nettoyage. Carrelage, sanitaires et meubles fournis par le client", "forfait", 4500],
+  ["Rénovation complète", "Électricité complète de salle de bain : prises, éclairage, spots LED, raccordement du sèche-serviettes et du miroir, VMC, mise aux normes. Appareillage fourni par le client", "forfait", 817.27],
+  ["Rénovation complète", "Faux plafond placo hydro avec spots LED, jusqu'à 6 m² : ossature, plaques, bandes, enduit, pose et raccordement des spots. Spots fournis par le client", "forfait", 726.36]
+];
+PRESTATIONS_DEFAUT.push(...FORFAITS_SUITE);
+
 // Prestations ajoutées après coup : versées une seule fois dans une base déjà remplie.
 // Celles que l'artisan a déjà (même désignation, même archivées) ne sont pas ajoutées deux fois.
 export const AJOUTS_PRESTATIONS = [
-  { cle: "forfaits-taille-2026-10", lignes: PRESTATIONS_DEFAUT.filter(p => p[0] === "Rénovation complète" && !PRESTATIONS_SUITE.includes(p)) },
+  { cle: "forfaits-taille-2026-10", lignes: PRESTATIONS_DEFAUT.filter(p => p[0] === "Rénovation complète" && !PRESTATIONS_SUITE.includes(p) && !FORFAITS_SUITE.includes(p)) },
   { cle: "prestations-suite-2026-10", lignes: PRESTATIONS_SUITE },
-  { cle: "prestations-3d-2026-10", lignes: PRESTATIONS_3D }
+  { cle: "prestations-3d-2026-10", lignes: PRESTATIONS_3D },
+  { cle: "forfaits-suite-2026-10", lignes: FORFAITS_SUITE }
 ];
 
 // Désignations corrigées après coup : une ligne restée telle quelle chez l'artisan prend le nouveau texte.
