@@ -1,5 +1,5 @@
 // Accès aux données : Supabase quand il est configuré, sinon le navigateur (mode essai).
-import { PARAMETRES_DEFAUT, PRESTATIONS_DEFAUT } from "./donnees.js";
+import { PARAMETRES_DEFAUT, PRESTATIONS_DEFAUT, AJOUTS_PRESTATIONS } from "./donnees.js";
 
 const cfg = window.KA_CONFIG || {};
 export const MODE_ESSAI = !(cfg.supabaseUrl && cfg.supabaseKey);
@@ -176,6 +176,21 @@ export async function amorcerPrestations() {
   if (count) return;
   await sb.from("prestations").insert(PRESTATIONS_DEFAUT.map(([categorie, designation, unite, prix_ht]) =>
     ({ categorie, designation, unite, prix_ht })));
+}
+
+/* Verse une fois les prestations ajoutées depuis (AJOUTS_PRESTATIONS) ; l'artisan peut ensuite les modifier ou les archiver. */
+export async function ajouterNouvellesPrestations() {
+  let brut;  // réglages tels qu'enregistrés, sans les valeurs par défaut
+  if (MODE_ESSAI) brut = lireLocal("parametres")[0]?.data || {};
+  else { const { data } = await sb.from("parametres").select("data").eq("id", 1).maybeSingle(); brut = data?.data || {}; }
+  const faits = brut.ajouts_prestations || [];
+  const reste = AJOUTS_PRESTATIONS.filter(a => !faits.includes(a.cle));
+  if (!reste.length) return;
+  const deja = new Set((await lister("prestations")).map(x => x.designation));
+  for (const a of reste)
+    for (const [categorie, designation, unite, prix_ht] of a.lignes)
+      if (!deja.has(designation)) await enregistrer("prestations", { categorie, designation, unite, prix_ht });
+  await enregistrerParametres({ ...brut, ajouts_prestations: [...faits, ...reste.map(a => a.cle)] });
 }
 
 /* ---------- Sauvegarde complète (fichier) ---------- */

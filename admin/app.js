@@ -876,6 +876,7 @@ async function demarrer() {
   nav.hidden = false;
   document.getElementById("etat").innerHTML = db.MODE_ESSAI ? '<span class="mode" title="Les données restent dans ce navigateur">Mode essai</span>' : "";
   await db.amorcerPrestations();
+  await db.ajouterNouvellesPrestations().catch(() => {});
   P = await db.parametres();
   window.onhashchange = routeur;
   routeur();
