@@ -590,6 +590,12 @@ const HORS_FORFAIT = new Set(["wc", "wcSol", "wcLaveMains", "bidet", "baignoire"
   "colonne", "meubleHaut", "etagere"]);
 const FORFAITS = [[4, "Petite salle de bain"], [6, "Salle de bain moyenne"], [9, "Grande salle de bain, de 6"], [Infinity, "Très grande salle de bain"]];
 
+// Recherche de l'article chez les magasins : la page du magasin s'ouvre dans un nouvel onglet
+const MAGASINS = [["Leroy Merlin", q => `https://www.leroymerlin.fr/search?keyword=${q}`], ["Castorama", q => `https://www.castorama.fr/search?term=${q}`],
+  ["Brico Dépôt", q => `https://www.bricodepot.fr/catalogue/recherche?q=${q}`], ["ManoMano", q => `https://www.manomano.fr/recherche/${q}`]];
+function magasins(terme) { return `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${MAGASINS.map(([nom, url]) =>
+    `<a href="${url(encodeURIComponent(terme.replace(/×/g, "x").replace(/[()]/g, "").replace(/ seule?(?![a-z])/g, "").trim()))}" target="_blank" rel="noopener" style="font-size:12px;border:1px solid var(--sable);border-radius:999px;padding:3px 10px;text-decoration:none;color:inherit;background:var(--blanc)">${nom}</a>`).join("")}</div>`; }
+
 /* =================================================================== */
 export async function monterSimulateur(vue, { db, params, toast, esc, choisirClient, nomClient, creerDevis }) {
   const defaut = () => ({
@@ -1071,6 +1077,15 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     if (fix) ajoute("Chevilles et vis inox", pl(fix, "kit"), "fixation des barres et du siège de douche");
     return liste;
   }
+  // Sanitaires, meubles et équipements posés dans la 3D, à acheter par le client
+  function aAcheter() {
+    const l = {};
+    etat.objets.filter(o => ["Sanitaires", "Meubles", "Équipements"].includes(CAT[o.type].groupe) && !/^Exist/.test(o.travaux || "")).forEach(o => {
+      const c = CAT[o.type], taille = !c.tailles ? "" : o.d < .06 ? ` ${Math.round(o.w * 100)}` : ` ${Math.round(o.w * 100)}x${Math.round(o.d * 100)}`;
+      const k = c.nom + taille; l[k] = l[k] || { nom: c.nom, taille: taille.trim(), n: 0 }; l[k].n++;
+    });
+    return Object.values(l);
+  }
   // Texte de commande prêt à envoyer (WhatsApp, SMS, mail) au fournisseur
   function texteCommande() {
     const f = v => (Math.ceil(v * 10) / 10).toLocaleString("fr-FR");
@@ -1089,17 +1104,22 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     const m = metre(), f = n => n.toLocaleString("fr-FR", { maximumFractionDigits: 1 });
     const ouvert = document.querySelector("#metre .deroule-carrelage")?.open, cmd = carrelageACommander();
     const ouvertF = document.querySelector("#metre .deroule-fournitures")?.open, fourn = fournitures();
+    const ouvertS = document.querySelector("#metre .deroule-sanitaires")?.open, achats = aAcheter();
     const bloc = (v, t) => `<div><b style="font-family:var(--serif);font-size:20px;font-weight:400">${f(v)} m²</b><br><span class="gris" style="font-size:13px">${t}</span></div>`;
     document.getElementById("metre").innerHTML = `<div class="petit" style="margin-bottom:8px">Métré</div>
       <div class="deux" style="gap:12px">${bloc(m.sol, `sol · ${FORMATS[etat.sol.format].nom}`)}${bloc(m.murs, "faïence murale")}${bloc(m.peinture, "peinture murs")}${bloc(m.plafond, "plafond")}</div>
       <details class="groupe-ajout deroule-carrelage" style="margin-top:10px;border-bottom:0;border-top:1px solid var(--sable)" ${ouvert ? "open" : ""}><summary>Carrelage à acheter (client)<span>${f(cmd.reduce((a, c) => a + Math.ceil(c.total * 10) / 10, 0))} m² en tout</span></summary>
       ${cmd.map(c => `<div style="display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--sable)">
-        <div><b style="font-weight:600">${c.titre}</b><br><span class="gris" style="font-size:13px">${esc(c.matiere)} · ${esc(c.format)}<br>${f(c.surf)} m² posés + ${Math.round(c.chute * 100)} % de chutes</span></div>
+        <div><b style="font-weight:600">${c.titre}</b><br><span class="gris" style="font-size:13px">${esc(c.matiere)} · ${esc(c.format)}<br>${f(c.surf)} m² posés + ${Math.round(c.chute * 100)} % de chutes</span>${magasins(`${c.cle === "parquet" ? "sol PVC imitation parquet" : "carrelage"} ${c.matiere} ${c.format}`)}</div>
         <div style="text-align:right;white-space:nowrap"><b style="font-family:var(--serif);font-size:20px;font-weight:400">${f(Math.ceil(c.total * 10) / 10)} m²</b>${c.n ? `<br><span class="gris" style="font-size:13px">≈ ${c.n.toLocaleString("fr-FR")} ${c.unite}</span>` : ""}</div></div>`).join("")}
       <p class="gris" style="font-size:12px;margin-top:6px">Arrondissez au nombre de boîtes du fournisseur.</p></details>
+      ${achats.length ? `<details class="groupe-ajout deroule-sanitaires" style="border-bottom:0;border-top:1px solid var(--sable)" ${ouvertS ? "open" : ""}><summary>Sanitaires et meubles (client)<span>${achats.reduce((a, x) => a + x.n, 0)} articles</span></summary>
+      ${achats.map(x => `<div style="display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--sable)">
+        <div><b style="font-weight:600">${esc(x.nom)}</b>${x.taille ? `<br><span class="gris" style="font-size:13px">${esc(x.taille.replace("x", " × "))} cm</span>` : ""}${magasins(`${x.nom} ${x.taille}`)}</div>
+        <div style="text-align:right;white-space:nowrap;font-weight:600">${x.n}</div></div>`).join("")}</details>` : ""}
       <details class="groupe-ajout deroule-fournitures" style="border-bottom:0;border-top:1px solid var(--sable)" ${ouvertF ? "open" : ""}><summary>Mes consommables<span>${fourn.length} articles</span></summary>
       ${fourn.map(x => `<div style="display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--sable)">
-        <div><b style="font-weight:600">${esc(x.nom)}</b>${x.detail ? `<br><span class="gris" style="font-size:13px">${esc(x.detail)}</span>` : ""}</div>
+        <div><b style="font-weight:600">${esc(x.nom)}</b>${x.detail ? `<br><span class="gris" style="font-size:13px">${esc(x.detail)}</span>` : ""}${magasins(x.nom)}</div>
         <div style="text-align:right;white-space:nowrap;font-weight:600">${esc(x.qte)}</div></div>`).join("")}
       <p class="gris" style="font-size:12px;margin-top:6px">Quantités courantes de pose : vérifiez la fiche du produit choisi.</p></details>
       <div class="actions-doc" style="margin:12px 0 0"><button type="button" class="btn clair petit-btn" data-commande="envoyer">Commander mes consommables</button><button type="button" class="btn discret petit-btn" data-commande="copier">Copier</button></div>`;
