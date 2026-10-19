@@ -595,8 +595,17 @@ const MAGASINS = [["Leroy Merlin", q => `https://www.leroymerlin.fr/search?q=${q
   ["Brico Dépôt", q => `https://www.bricodepot.fr/search?search-term=${q}`], ["ManoMano", q => `https://www.manomano.fr/recherche/${q}`],
   ["Point.P", q => `https://www.pointp.fr/search?q=${q}`], ["Mr.Bricolage", q => `https://www.mr-bricolage.fr/catalogsearch/result/?q=${q}`],
   ["Bricomarché", q => `https://www.bricomarche.com/search?q=${q}`]];
-function magasins(terme) { return `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${MAGASINS.map(([nom, url]) =>
-    `<a href="${url(encodeURIComponent(terme.replace(/×/g, "x").replace(/[()]/g, "").replace(/ seule?(?![a-z])/g, "").replace(/ +/g, " ").trim()))}" target="_blank" rel="noopener" style="font-size:12px;border:1px solid var(--sable);border-radius:999px;padding:3px 10px;text-decoration:none;color:inherit;background:var(--blanc)">${nom}</a>`).join("")}</div>`; }
+// Recherches déjà ouvertes, gardées sur le téléphone : on voit où l'on en est en revenant dans l'appli
+const CLE_VUS = "ka_magasins_vus";
+const vus = (() => { try { return new Set(JSON.parse(localStorage.getItem(CLE_VUS) || "[]")); } catch { return new Set(); } })();
+function noterVu(cle) { vus.add(cle); try { localStorage.setItem(CLE_VUS, JSON.stringify([...vus].slice(-500))); } catch { /* navigateur privé */ } }
+function magasins(terme) {
+  const t = terme.replace(/×/g, "x").replace(/[()]/g, "").replace(/ seule?(?![a-z])/g, "").replace(/ +/g, " ").trim();
+  return `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${MAGASINS.map(([nom, url]) => {
+    const cle = t + "|" + nom, vu = vus.has(cle);
+    return `<a href="${url(encodeURIComponent(t))}" target="_blank" rel="noopener" data-vu="${cle.replace(/"/g, "&quot;")}" style="font-size:12px;border:1px solid ${vu ? "var(--ok)" : "var(--sable)"};border-radius:999px;padding:3px 10px;text-decoration:none;color:${vu ? "var(--ok)" : "inherit"};background:var(--blanc)">${vu ? "✓ " : ""}${nom}</a>`;
+  }).join("")}</div>`;
+}
 
 /* =================================================================== */
 export async function monterSimulateur(vue, { db, params, toast, esc, choisirClient, nomClient, creerDevis }) {
@@ -1108,6 +1117,8 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
       "", "Merci de me confirmer la disponibilité et le délai.", "KA Rénovation — 07 63 14 76 27"].join("\n");
   }
   document.getElementById("metre").addEventListener("click", async e => {
+    const a = e.target.closest("a[data-vu]");
+    if (a) { noterVu(a.dataset.vu); if (!a.textContent.startsWith("✓")) a.textContent = "✓ " + a.textContent; a.style.color = a.style.borderColor = "var(--ok)"; return; }
     const b = e.target.closest("[data-commande]"); if (!b) return;
     const texte = texteCommande();
     if (b.dataset.commande === "envoyer" && navigator.share) { try { await navigator.share({ text: texte }); return; } catch (er) { if (er.name === "AbortError") return; } }
