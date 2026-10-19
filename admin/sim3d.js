@@ -596,7 +596,7 @@ const MAGASINS = [["Leroy Merlin", q => `https://www.leroymerlin.fr/search?q=${q
   ["Point.P", q => `https://www.pointp.fr/search?q=${q}`], ["Mr.Bricolage", q => `https://www.mr-bricolage.fr/catalogsearch/result/?q=${q}`],
   ["Bricomarché", q => `https://www.bricomarche.com/search?q=${q}`]];
 function magasins(terme) { return `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${MAGASINS.map(([nom, url]) =>
-    `<a href="${url(encodeURIComponent(terme.replace(/×/g, "x").replace(/[()]/g, "").replace(/ seule?(?![a-z])/g, "").trim()))}" target="_blank" rel="noopener" style="font-size:12px;border:1px solid var(--sable);border-radius:999px;padding:3px 10px;text-decoration:none;color:inherit;background:var(--blanc)">${nom}</a>`).join("")}</div>`; }
+    `<a href="${url(encodeURIComponent(terme.replace(/×/g, "x").replace(/[()]/g, "").replace(/ seule?(?![a-z])/g, "").replace(/ +/g, " ").trim()))}" target="_blank" rel="noopener" style="font-size:12px;border:1px solid var(--sable);border-radius:999px;padding:3px 10px;text-decoration:none;color:inherit;background:var(--blanc)">${nom}</a>`).join("")}</div>`; }
 
 /* =================================================================== */
 export async function monterSimulateur(vue, { db, params, toast, esc, choisirClient, nomClient, creerDevis }) {
@@ -1080,11 +1080,23 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     return liste;
   }
   // Sanitaires, meubles et équipements posés dans la 3D, à acheter par le client
+  // Couleur choisie pour l'élément : receveur, bois du meuble, couleur, profilé, verre ; la robinetterie pour la colonne de douche
+  function couleurDe(o) {
+    const rob = (ROBINETTERIE[etat.robinetterie]?.nom || "").toLowerCase(), l = [];
+    if (o.receveur && o.receveur !== "Carrelé") l.push(o.receveur.toLowerCase());
+    if (o.finition) l.push((BOIS[o.finition] || "").toLowerCase());
+    if (o.couleur) l.push(o.couleur === "Comme la robinetterie" ? rob : o.couleur.toLowerCase());
+    if (o.profile && o.profile !== "Sans profilé") l.push(o.profile.replace("Profilé ", "").toLowerCase());
+    if (o.verre === "Verre dépoli") l.push("dépoli");
+    if (o.type === "colonneDouche") l.push(rob);
+    return l.filter(Boolean).join(" ");
+  }
   function aAcheter() {
     const l = {};
     etat.objets.filter(o => ["Sanitaires", "Meubles", "Équipements"].includes(CAT[o.type].groupe) && !/^Exist/.test(o.travaux || "")).forEach(o => {
       const c = CAT[o.type], taille = !c.tailles ? "" : o.d < .06 ? ` ${Math.round(o.w * 100)}` : ` ${Math.round(o.w * 100)}x${Math.round(o.d * 100)}`;
-      const k = c.nom + taille; l[k] = l[k] || { nom: c.nom, taille: taille.trim(), n: 0 }; l[k].n++;
+      const coul = couleurDe(o), k = c.nom + taille + "|" + coul;
+      l[k] = l[k] || { nom: c.nom, taille: taille.trim(), couleur: coul, n: 0 }; l[k].n++;
     });
     return Object.values(l);
   }
@@ -1117,7 +1129,7 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
       <p class="gris" style="font-size:12px;margin-top:6px">Arrondissez au nombre de boîtes du fournisseur.</p></details>
       ${achats.length ? `<details class="groupe-ajout deroule-sanitaires" style="border-bottom:0;border-top:1px solid var(--sable)" ${ouvertS ? "open" : ""}><summary>Sanitaires et meubles (client)<span>${achats.reduce((a, x) => a + x.n, 0)} articles</span></summary>
       ${achats.map(x => `<div style="display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--sable)">
-        <div><b style="font-weight:600">${esc(x.nom)}</b>${x.taille ? `<br><span class="gris" style="font-size:13px">${esc(x.taille.replace("x", " × "))} cm</span>` : ""}${magasins(`${x.nom} ${x.taille}`)}</div>
+        <div><b style="font-weight:600">${esc(x.nom)}</b>${x.taille || x.couleur ? `<br><span class="gris" style="font-size:13px">${[x.taille ? esc(x.taille.replace("x", " × ")) + " cm" : "", esc(x.couleur)].filter(Boolean).join(" · ")}</span>` : ""}${magasins(`${x.nom} ${x.taille} ${x.couleur}`)}</div>
         <div style="text-align:right;white-space:nowrap;font-weight:600">${x.n}</div></div>`).join("")}</details>` : ""}
       <details class="groupe-ajout deroule-fournitures" style="border-bottom:0;border-top:1px solid var(--sable)" ${ouvertF ? "open" : ""}><summary>Mes consommables<span>${fourn.length} articles</span></summary>
       ${fourn.map(x => `<div style="display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--sable)">
