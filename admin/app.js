@@ -38,6 +38,16 @@ const quelDoc = d => { const av = avenantDe(d); return av ? `l'avenant n° ${av.
 const msgSignature = d => `Bonjour ${politesse(d.client)},\n\nVoici ${avenantDe(d) ? quelDoc(d) : `votre devis ${d.numero}`} de KA Rénovation. Vous pouvez le lire, le télécharger et le signer en ligne ici :\n${lienSignature(d)}\n\nBonne journée,\nKA Rénovation`;
 const msgRelance = d => `Bonjour ${politesse(d.client)},\n\nJe reviens vers vous au sujet de ${quelDoc(d)}. Il est toujours consultable et à signer en ligne ici :\n${lienSignature(d)}\n\nN'hésitez pas si vous avez des questions.\nKA Rénovation`;
 const SEPT_JOURS = 7 * 864e5;
+// Relance d'une facture envoyée et pas encore payée : le reste à payer, et l'IBAN s'il est dans les réglages
+const echeanceFacture = d => { const e = new Date(d.date + "T12:00:00"); e.setDate(e.getDate() + (Number(P?.echeance_jours) || 30)); return e; };
+const msgRelanceFacture = d => {
+  const t = totaux(d), echue = Date.now() > echeanceFacture(d);
+  const virement = P?.iban ? `\n\nVous pouvez faire le virement sur ce compte :\nIBAN : ${P.iban}${P.bic ? `\nBIC : ${P.bic}` : ""}${P.titulaire ? `\nTitulaire : ${P.titulaire}` : ""}\nRéférence : ${d.numero}` : "";
+  return `Bonjour ${politesse(d.client)},\n\nSauf erreur de ma part, la facture ${d.numero} du ${dateFr(d.date)} n'est pas encore réglée : il reste ${eur(t.reste)} € à payer${echue ? ` (échéance au ${echeanceFacture(d).toLocaleDateString("fr-FR")})` : ""}.${virement}\n\nMerci d'avance, et n'hésitez pas si vous avez une question.\nKA Rénovation`;
+};
+// à relancer : envoyée, pas payée, échéance passée, et pas relancée (ni modifiée) depuis 7 jours
+const aRelancerFacture = d => d.type === "facture" && d.statut === "envoye" && totaux(d).reste > 0.01 && Date.now() > echeanceFacture(d)
+  && Date.now() - new Date(d.updated_at || d.created_at) > SEPT_JOURS;
 const aRelancer = d => d.type === "devis" && d.statut === "envoye" && !d.signe_le && d.jeton && Date.now() - new Date(d.updated_at || d.created_at) > SEPT_JOURS;
 async function listerDemandes() { try { return await db.lister("demandes"); } catch { return null; } }
 
@@ -86,7 +96,7 @@ async function vueAccueil() {
   const [docs, clients, demandes, depenses] = await Promise.all([db.lister("documents"), db.lister("clients"), listerDemandes(), db.listerDepenses(["depense", "paiement", "avancement", "rdv"]).catch(() => [])]);
   const montants = depenses.splice(0); depenses.push(...montants.filter(x => (x.type || "depense") === "depense"));
   const nouvelles = (demandes || []).filter(x => x.statut === "nouvelle");
-  const relances = docs.filter(aRelancer);
+  const relances = docs.filter(aRelancer), relancesF = docs.filter(aRelancerFacture);
   const devisAttente = docs.filter(d => d.type === "devis" && ["brouillon", "envoye"].includes(d.statut));
   const aEncaisser = docs.filter(d => d.type === "facture" && d.statut === "envoye");
   const mois = aujourdhui().slice(0, 7);
@@ -107,6 +117,9 @@ async function vueAccueil() {
     ${relances.length ? `<h2 style="margin-bottom:12px">À relancer</h2>
     <p class="gris" style="font-size:14px;margin:-6px 0 12px">Devis envoyés il y a plus de 7 jours, toujours sans réponse.</p>
     <div class="liste" id="relances" style="margin-bottom:26px">${relances.map(d => `<div class="ligne-liste"><a href="#/document/${d.id}" style="text-decoration:none;flex:1"><b>${esc(d.numero)}</b><small>${esc(nomClient(d.client))} · envoyé le ${dateFr(String(d.updated_at || d.created_at).slice(0, 10))}</small></a><button class="btn clair" data-relance="${d.id}">Relancer</button></div>`).join("")}</div>` : ""}
+    ${relancesF.length ? `<h2 style="margin-bottom:12px">Factures à relancer</h2>
+    <p class="gris" style="font-size:14px;margin:-6px 0 12px">Factures envoyées, échéance passée, toujours pas réglées.</p>
+    <div class="liste" id="relancesF" style="margin-bottom:26px">${relancesF.map(d => `<div class="ligne-liste"><a href="#/document/${d.id}" style="text-decoration:none;flex:1"><b>${esc(d.numero)}</b><small>${esc(nomClient(d.client))} · reste ${eur(totaux(d).reste)} €</small></a><button class="btn clair" data-relance-f="${d.id}">Relancer</button></div>`).join("")}</div>` : ""}
     <div class="raccourcis">
       <a href="#/document/nouveau/devis">${ICO.devis}Nouveau devis</a>
       <a href="#/document/nouveau/facture">${ICO.devis}Nouvelle facture</a>
@@ -120,6 +133,14 @@ async function vueAccueil() {
     const b = e.target.closest("[data-relance]"); if (!b) return;
     const d = relances.find(x => x.id === b.dataset.relance);
     await envoyerMessage(d, msgRelance(d));
+    try { await db.enregistrer("documents", { ...d }); } catch (er) { erreur(er); } // repart pour 7 jours
+    b.closest(".ligne-liste").remove(); toast("Relance envoyée ✓");
+  };
+  const rf = document.getElementById("relancesF");
+  if (rf) rf.onclick = async e => {
+    const b = e.target.closest("[data-relance-f]"); if (!b) return;
+    const d = relancesF.find(x => x.id === b.dataset.relanceF);
+    await envoyerMessage(d, msgRelanceFacture(d));
     try { await db.enregistrer("documents", { ...d }); } catch (er) { erreur(er); } // repart pour 7 jours
     b.closest(".ligne-liste").remove(); toast("Relance envoyée ✓");
   };
@@ -322,6 +343,7 @@ async function vueDocument(id, type, params) {
             ${estDevis && d.id ? `<button class="btn discret" id="versFacture">Transformer en facture</button>` : ""}
             ${estDevis && d.id && !av && d.statut === "signe" ? `<button class="btn clair" id="avenant">${ICO.plus}Créer un avenant</button>` : ""}
             ${d.id && !av && ((estDevis && d.statut === "signe") || (!estDevis && d.devis_id)) ? `<a class="btn clair" href="#/reception/${estDevis ? d.id : d.devis_id}">PV de fin de chantier</a>` : ""}
+            ${!estDevis && d.id && d.statut === "envoye" && totaux(d).reste > 0.01 ? `<button class="btn clair" id="relanceF">Relancer le paiement</button>` : ""}
             ${d.id ? `<button class="btn discret" id="dupliquer">Dupliquer</button>` : ""}
             ${d.id && (estDevis || d.statut === "brouillon") ? `<button class="btn danger" id="suppr">${ICO.poubelle}Supprimer</button>` : ""}
           </div>
@@ -454,6 +476,10 @@ async function vueDocument(id, type, params) {
         const r = await db.enregistrer("documents", a); // l'avenant ne prend pas de numéro de devis
         toast("Avenant créé ✓"); location.hash = "#/document/" + r.id;
       } catch (e) { erreur(e); }
+    };
+    const rlf = document.getElementById("relanceF");
+    if (rlf) rlf.onclick = async () => {
+      try { await enregistrer(); await envoyerMessage(d, msgRelanceFacture(d)); await db.enregistrer("documents", { ...d }); toast("Relance envoyée ✓"); } catch (e) { erreur(e); }
     };
     const du = document.getElementById("dupliquer");
     if (du) du.onclick = async () => {
