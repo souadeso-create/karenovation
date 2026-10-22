@@ -622,6 +622,36 @@ function magasins(terme) {
   }).join("")}</div>`;
 }
 
+// Ce que le client veut (texte de la visite) → éléments de la 3D, du plus précis au plus général
+const PROJET_3D = [
+  [/italienne/i, "douche"], [/douche/i, "doucheCabine"], [/baignoire\s+(îlot|ilot)/i, "ilot"],
+  [/(nouvelle|garder|garde|avec une|une)\s+baignoire/i, "baignoire"], [/wc\s+suspendu/i, "wc"], [/wc\s+(au sol|posé)/i, "wcSol"],
+  [/double\s+vasque/i, "double"], [/vasque|lavabo|meuble\s+sous/i, "vasque"], [/s[èe]che[- ]serviettes?/i, "radiateur"],
+  [/radiateur/i, "radiateurEau"], [/miroir/i, "miroir"], [/colonne\s+de\s+douche/i, "colonneDouche"],
+  [/colonne\s+de\s+rangement|rangement/i, "colonne"], [/lave[- ]linge|machine\s+à\s+laver/i, "laveLinge"], [/niche|étagère/i, "etagere"],
+  [/lave[- ]mains/i, "laveMains"], [/bidet/i, "bidet"]
+];
+function elementsDuProjet(texte) {
+  const t = String(texte || ""), vus = [];
+  for (const [re, type] of PROJET_3D) {
+    if (!re.test(t)) continue;
+    if (type === "doucheCabine" && vus.includes("douche")) continue; // « douche à l'italienne » : pas aussi une douche à porte
+    if (type === "vasque" && vus.includes("double")) continue;
+    if (type === "radiateurEau" && vus.includes("radiateur")) continue;
+    if (type === "colonne" && /colonne\s+de\s+douche/i.test(t) && !/rangement/i.test(t)) continue;
+    if (!vus.includes(type)) vus.push(type);
+  }
+  return vus;
+}
+// la dernière visite du client, de préférence celle de la salle de bain
+async function derniereVisite(db, clientId) {
+  try {
+    const v = (await db.listerCarnet(clientId)).filter(l => l.type === "mesures").sort((a, b) => a.created_at < b.created_at ? 1 : -1)
+      .map(l => { try { return { ...JSON.parse(l.texte || "{}"), le: l.created_at }; } catch { return null; } }).filter(Boolean);
+    return v.find(m => /salle|eau|douche/i.test(m.piece || "")) || v[0] || null;
+  } catch { return null; }
+}
+
 /* =================================================================== */
 export async function monterSimulateur(vue, { db, params, toast, esc, choisirClient, nomClient, creerDevis }) {
   const defaut = () => ({
@@ -636,6 +666,20 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     const s = await db.lire("simulations", params.get("sim"));
     if (s) { etat = migrer({ ...defaut(), ...s.data }); simId = s.id; validation = { jeton: s.jeton, valide_le: s.valide_le, valide_nom: s.valide_nom }; etat.nom = s.nom || etat.nom; if (s.client_id) client = await db.lire("clients", s.client_id); }
   } else if (params.get("client")) client = await db.lire("clients", params.get("client"));
+  // nouvelle simulation d'un client : on part de sa visite
+  const visite = !simId && client ? await derniereVisite(db, client.id) : null;
+  if (visite) {
+    const n = v => Number(String(v ?? "").replace(",", ".")) || 0, borne = (v, a, b) => Math.min(b, Math.max(a, v));
+    if (visite.piece) etat.nom = visite.piece;
+    if (visite.forme !== "autre" && n(visite.l) && n(visite.p)) { etat.dims.l = borne(n(visite.l), 1, 9); etat.dims.p = borne(n(visite.p), 1, 9); }
+    else if (visite.forme === "autre") { // pièce qui n'est pas un rectangle : un rectangle de même surface, à ajuster
+      const parts = visite.parties || [], L = Math.max(0, ...parts.map(([x]) => n(x))), S = n(visite.sol) || parts.reduce((a, [x, y]) => a + n(x) * n(y), 0);
+      if (L && S) { etat.dims.l = borne(L, 1, 9); etat.dims.p = borne(S / L, 1, 9); }
+    }
+    if (n(visite.h)) etat.dims.h = borne(n(visite.h), 2, 4);
+    etat.depose = !!(visite.existant || []).length || etat.depose;
+  }
+  const aPoser = visite ? elementsDuProjet(visite.souhaits) : [];
   etat.objets = etat.objets.filter(o => CAT[o.type]); etat.objets.forEach(completer);
 
   function migrer(e) { // simulations enregistrées avant la refonte
@@ -661,6 +705,13 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
       <button class="btn clair" id="clientSim">${client ? esc(nomClient(client)) : "Associer un client"}</button></div>
     <div class="deux-col">
       <div>
+        ${visite ? `<div class="carte visite-3d" id="visite3d" style="margin-bottom:12px">
+          <b>D'après la visite du ${new Date(visite.le).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}${visite.piece ? " · " + esc(visite.piece) : ""}</b>
+          <p class="gris" style="font-size:13px">${visite.forme === "autre" ? "Pièce non rectangulaire : la 3D part d'un rectangle de même surface, à ajuster." : "Dimensions de la pièce reprises de la visite."}</p>
+          ${(visite.existant || []).length ? `<p style="font-size:14px;margin-top:6px"><span class="gris">Aujourd'hui :</span> ${esc(visite.existant.join(", "))}</p>` : ""}
+          ${visite.souhaits ? `<p style="font-size:14px;margin-top:4px"><span class="gris">Le client veut :</span> ${esc(visite.souhaits)}</p>` : ""}
+          ${aPoser.length ? `<div class="palette" style="margin-top:8px">${aPoser.map(t => `<button type="button" class="btn clair petit-btn" data-poser="${t}">+ ${esc(CAT[t].nom)}</button>`).join("")}</div>` : ""}
+        </div>` : ""}
         <div class="sim" id="scene"><div class="aide3d">Glissez pour tourner · pincez pour zoomer · touchez un élément pour le déplacer</div><div class="tournage" id="tournage" hidden>Vidéo en cours… <b id="tournageS">10</b> s</div></div>
         <div class="carte" id="selPanneau" hidden style="margin-top:12px"></div>
         <div class="actions-doc">
@@ -1744,6 +1795,13 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     p.innerHTML = q ? `<b style="color:#2f6f4f">✓ Choix validés par ${esc(validation.valide_nom)} le ${q.toLocaleDateString("fr-FR")}</b>`
       : etat.choix && validation.jeton ? "Lien envoyé : en attente de la validation du client." : "";
   }
+  // éléments du projet du client (visite) : un toucher les pose, côte à côte le long du mur du fond
+  let decalVisite = 0;
+  document.getElementById("visite3d")?.querySelectorAll("[data-poser]").forEach(b => b.onclick = () => {
+    const t = b.dataset.poser, i = ajouterObjet(t), o = etat.objets[i], { l } = etat.dims;
+    if (CAT[t].pose === "mur") { o.x = Math.min(l / 2 - o.w / 2, -l / 2 + o.w / 2 + decalVisite); decalVisite += o.w + .1; placer(i); }
+    b.disabled = true; b.textContent = "✓ " + CAT[t].nom;
+  });
   document.getElementById("validerClient").onclick = async () => {
     try {
       if (!client && !confirm("Aucun client n'est associé à cette simulation. Continuer quand même ?")) return;
