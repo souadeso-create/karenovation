@@ -29,6 +29,34 @@ export function etatPaiements(lignes, totalDevis, acompte) {
   return { verse, pct, du, aReclamer: Math.max(0, Math.round((du - verse) * 100) / 100) };
 }
 const eur = n => (Number(n) || 0).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const arrondi2 = n => Math.round(n * 100) / 100;
+// un paiement reçu vient en déduction des factures envoyées du client, la plus ancienne d'abord
+async function imputerPaiement(db, clientId, montant) {
+  const factures = (await db.lister("documents")).filter(d => d.client_id === clientId && d.type === "facture" && d.statut === "envoye")
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  let reste = montant; const part = {}, payees = [], numeros = [];
+  for (const d of factures) {
+    if (reste <= 0.01) break;
+    const du = totaux(d).reste; if (du <= 0.01) continue;
+    const a = arrondi2(Math.min(du, reste));
+    d.deja_regle = arrondi2((Number(d.deja_regle) || 0) + a);
+    if (totaux(d).reste <= 0.01) { d.statut = "paye"; payees.push(d.id); }
+    await db.enregistrer("documents", d);
+    part[d.id] = a; numeros.push(d.numero); reste = arrondi2(reste - a);
+  }
+  return { part, payees, numeros };
+}
+// on retire un paiement : les factures retrouvent ce qu'elles avaient avant
+async function annulerImputation(db, ligne) {
+  let imp; try { imp = JSON.parse(ligne.categorie || ""); } catch { return; }
+  if (!imp?.part) return;
+  for (const [id, a] of Object.entries(imp.part)) {
+    const d = await db.lire("documents", id); if (!d) continue;
+    d.deja_regle = Math.max(0, arrondi2((Number(d.deja_regle) || 0) - Number(a)));
+    if ((imp.payees || []).includes(id) && d.statut === "paye") d.statut = "envoye";
+    await db.enregistrer("documents", d);
+  }
+}
 const estPhoto = l => (l.chemin || l.image) && l.type !== "depense";
 
 // photo du téléphone → JPEG de 1600 px au plus
@@ -195,7 +223,7 @@ export async function monterCarnet(el, { db, client, P = {}, toast, esc, erreur,
     document.body.appendChild(t);
     const minuteur = setTimeout(async () => {
       t.remove();
-      try { await db.supprimerCarnet(l); lignes = lignes.filter(x => x.id !== id); } catch (e) { caches.delete(id); dessiner(); erreur(e); }
+      try { if (l.type === "paiement") await annulerImputation(db, l); await db.supprimerCarnet(l); lignes = lignes.filter(x => x.id !== id); } catch (e) { caches.delete(id); dessiner(); erreur(e); }
     }, 8000);
     t.querySelector("button").onclick = () => { clearTimeout(minuteur); t.remove(); caches.delete(id); dessiner(); };
   };
@@ -275,7 +303,19 @@ export async function monterCarnet(el, { db, client, P = {}, toast, esc, erreur,
       try {
         const n = await db.ajouterCarnet({ client_id: client.id, etape, type: saisie, texte: texte || null, ...(saisie === "depense" ? { montant, categorie: el.querySelector("#cCategorie").value } : saisie === "paiement" ? { montant } : {}) }, saisie === "depense" ? ticket : null);
         if (n.image || (ticket && n.chemin)) urls[n.id] = n.image || URL.createObjectURL(ticket);
-        lignes.unshift(n); toast(`${TYPES[saisie].nom} ajouté${saisie === "note" || saisie === "depense" ? "e" : ""} ✓`); saisie = null; ticket = null; dessiner();
+        let message = `${TYPES[saisie].nom} ajouté${saisie === "note" || saisie === "depense" ? "e" : ""} ✓`;
+        if (saisie === "paiement") {
+          try {
+            const imp = await imputerPaiement(db, client.id, montant);
+            if (imp.numeros.length) {
+              n.categorie = JSON.stringify(imp); await majLigne(n);
+              const ids = Object.keys(imp.part);
+              message = "Paiement noté ✓ · " + ids.map((id, i) => imp.payees.includes(id)
+                ? `facture ${imp.numeros[i]} réglée` : `${eur(imp.part[id])} € déduits de la facture ${imp.numeros[i]}`).join(", ");
+            }
+          } catch (e) { erreur(e); }
+        }
+        lignes.unshift(n); toast(message); saisie = null; ticket = null; dessiner();
       } catch (e) { erreur(e); }
     };
     el.querySelector("#cPhotos").onchange = async e => {

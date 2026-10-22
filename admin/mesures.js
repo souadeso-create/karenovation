@@ -107,7 +107,7 @@ export async function monterMesures(el, { db, client, toast, esc, erreur, compte
     <div class="actions-doc" style="margin:14px 0 0">
       <button type="button" class="btn discret petit-btn" id="vPrec">${etape ? "Précédent" : "Annuler"}</button>
       <button type="button" class="btn petit-btn" id="vSuiv" ${etape < ETAPES.length - 1 ? "" : "hidden"}>Suivant</button>
-      <button type="button" class="btn ${etape < ETAPES.length - 1 ? "clair" : ""} petit-btn" id="mOk">Enregistrer la visite</button>
+      <button type="button" class="btn petit-btn" id="mOk" ${etape < ETAPES.length - 1 ? "hidden" : ""}>Enregistrer la visite</button>
     </div>
   </div>`;
 
@@ -128,7 +128,7 @@ export async function monterMesures(el, { db, client, toast, esc, erreur, compte
     el.querySelector("#vTitre").textContent = ETAPES[etape];
     el.querySelector("#vPrec").textContent = etape ? "Précédent" : "Annuler";
     el.querySelector("#vSuiv").hidden = etape === ETAPES.length - 1;
-    el.querySelector("#mOk").classList.toggle("clair", etape < ETAPES.length - 1);
+    el.querySelector("#mOk").hidden = etape < ETAPES.length - 1; // on n'enregistre qu'au bout de la visite
     el.querySelector(".visite").scrollIntoView({ block: "start", behavior: "smooth" });
   };
 

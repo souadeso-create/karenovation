@@ -680,22 +680,19 @@ async function vueClient(id, params) {
       </form></details>
       <div>
         ${c.id ? `
-        <div class="actions-doc">
-          <a class="btn" href="#/document/nouveau/devis?client=${c.id}">${ICO.plus}Devis</a>
-          <a class="btn clair" href="#/document/nouveau/facture?client=${c.id}">${ICO.plus}Facture</a>
-          <a class="btn clair" href="#/3d?client=${c.id}">${ICO.cube}Simulation 3D</a>
-          ${c.tel ? `<a class="btn discret" href="tel:${esc(c.tel.replace(/\s/g, ""))}">Appeler</a>` : ""}
-        </div>
+        ${c.tel ? `<div class="actions-doc"><a class="btn discret" href="tel:${esc(c.tel.replace(/\s/g, ""))}">Appeler</a></div>` : ""}
         ${docs.some(d => d.type === "devis" && d.statut === "signe") ? `<details class="section-fiche" open><summary>PV de fin de chantier</summary>
         <div class="liste" id="listePV" style="margin-bottom:10px">${docs.filter(d => d.type === "devis" && d.statut === "signe").map(d => `<a class="ligne-liste" href="#/reception/${d.id}"><div><b>PV · devis ${esc(d.numero)}</b><small data-pv="${d.id}">${esc(d.objet || "")}</small></div><span class="gris">›</span></a>`).join("")}</div></details>` : ""}
         <details class="section-fiche"><summary>Visites et mesures<span id="nbMesures"></span></summary>
         <div id="mesures" style="margin-top:6px"><p class="gris">Chargement…</p></div></details>
-        <details class="section-fiche" open><summary>Carnet de chantier</summary>
+        <details class="section-fiche" ${params?.get("carnet") ? "open" : ""}><summary>Carnet de chantier<span></span></summary>
         <div id="carnet" style="margin-top:6px"><p class="gris">Chargement du carnet…</p></div></details>
         <details class="section-fiche"><summary>Devis et factures<span>${docs.length}</span></summary>
-        <div class="liste" style="margin-top:6px">${docs.map(ligneDoc).join("") || '<p class="gris">Aucun devis ni facture.</p>'}</div></details>
+        <div class="actions-doc" style="margin:6px 0 10px"><a class="btn petit-btn" href="#/document/nouveau/devis?client=${c.id}">${ICO.plus}Devis</a><a class="btn clair petit-btn" href="#/document/nouveau/facture?client=${c.id}">${ICO.plus}Facture</a></div>
+        <div class="liste">${docs.map(ligneDoc).join("") || '<p class="gris">Aucun devis ni facture.</p>'}</div></details>
         <details class="section-fiche"><summary>Simulations 3D<span>${sims.length}</span></summary>
-        <div class="liste" style="margin-top:6px">${sims.map(s => `<a class="ligne-liste" href="#/3d?sim=${s.id}"><div><b>${esc(s.nom || "Simulation")}</b><small>${dateFr(String(s.created_at).slice(0, 10))}</small></div>${s.image ? `<img src="${s.image}" alt="" style="width:64px;height:48px;object-fit:cover;border-radius:8px">` : ""}</a>`).join("") || '<p class="gris">Aucune simulation.</p>'}</div></details>` : ""}
+        <div class="actions-doc" style="margin:6px 0 10px"><a class="btn petit-btn" href="#/3d?client=${c.id}">${ICO.cube}Nouvelle simulation</a></div>
+        <div class="liste">${sims.map(s => `<a class="ligne-liste" href="#/3d?sim=${s.id}"><div><b>${esc(s.nom || "Simulation")}</b><small>${dateFr(String(s.created_at).slice(0, 10))}</small></div>${s.image ? `<img src="${s.image}" alt="" style="width:64px;height:48px;object-fit:cover;border-radius:8px">` : ""}</a>`).join("") || '<p class="gris">Aucune simulation.</p>'}</div></details>` : ""}
       </div>
     </div>`;
   // état de chaque PV : à faire, enregistré, ou signé
