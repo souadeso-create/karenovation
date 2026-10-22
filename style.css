@@ -42,6 +42,7 @@
   nav.menu a:hover { color: var(--encre); }
   .tel-haut { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; font-size: 14px; font-weight: 600; background: var(--encre); color: #fff; padding: 9px 16px; border-radius: 999px; }
   .tel-haut svg { width: 16px; height: 16px; }
+  .qui-haut { margin-left: auto; margin-right: 14px; font-size: 13px; font-weight: 600; color: var(--encre); text-decoration: none; border-bottom: 1px solid var(--encre); padding-bottom: 1px; }
 
   /* Héros */
   .heros { position: relative; min-height: calc(100svh - 66px); display: flex; align-items: flex-end; color: #fff; overflow: hidden; padding: 0; background: #2a2723; }
@@ -187,6 +188,7 @@
     body { padding-bottom: 0; }
     .barre { display: none; }
     nav.menu { display: flex; }
+    .qui-haut { display: none; }
     section { padding: 120px 0; }
     .bloc { padding: 0 32px; }
     .heros { min-height: 680px; }
