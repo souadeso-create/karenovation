@@ -829,7 +829,7 @@ function vueReglages() {
         <div class="champ"><label>Mention si sans TVA</label><input type="text" name="mention_tva" value="${esc(P.mention_tva)}"></div>
       </fieldset>
       <fieldset><legend>Liens d'affiliation</legend>
-        <p class="gris" style="font-size:13px;margin-bottom:10px">Pour la page que reçoit le client quand il valide son projet. Collez le lien donné par la plateforme d'affiliation, en écrivant <b>{url}</b> à la place de l'adresse du produit. Exemple Awin : https://www.awin1.com/cread.php?awinmid=12345&amp;awinaffid=67890&amp;ued={url}. Laissez vide pour un lien normal.</p>
+        <p class="gris" style="font-size:13px;margin-bottom:10px">Pour la page que reçoit le client quand il valide son projet. Collez une seule fois le lien donné par la plateforme d'affiliation, en écrivant <b>{url}</b> à la place de l'adresse de la page : l'appli y met toute seule la recherche de chaque article (nom, couleur, format). Exemple Awin : https://www.awin1.com/cread.php?awinmid=12345&amp;awinaffid=67890&amp;ued={url}. Laissez vide pour un lien normal.</p>
         ${MAGASINS_AFFIL.map(([k, nom]) => `<div class="champ"><label>${nom}</label><input type="text" name="${k}" value="${esc(P[k])}" placeholder="Lien normal" autocomplete="off" spellcheck="false"></div>`).join("")}
       </fieldset>
       <fieldset><legend>Textes des documents</legend>
