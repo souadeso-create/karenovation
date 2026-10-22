@@ -243,4 +243,4 @@
   .acces-admin svg { width: 13px; height: 13px; }
 
   /* Page « Qui suis-je » : la photo de Karim */
-  .vignette { display: block; width: 120px; height: 150px; border-radius: 16px; object-fit: cover; border: 3px solid #fff; margin-bottom: 18px; pointer-events: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+  .vignette { display: block; width: 132px; height: 132px; border-radius: 50%; object-fit: cover; border: 3px solid #fff; margin-bottom: 18px; pointer-events: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
