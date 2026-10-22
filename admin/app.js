@@ -688,10 +688,10 @@ async function vueClient(id, params) {
         </div>
         ${docs.some(d => d.type === "devis" && d.statut === "signe") ? `<details class="section-fiche" open><summary>PV de fin de chantier</summary>
         <div class="liste" id="listePV" style="margin-bottom:10px">${docs.filter(d => d.type === "devis" && d.statut === "signe").map(d => `<a class="ligne-liste" href="#/reception/${d.id}"><div><b>PV · devis ${esc(d.numero)}</b><small data-pv="${d.id}">${esc(d.objet || "")}</small></div><span class="gris">›</span></a>`).join("")}</div></details>` : ""}
+        <details class="section-fiche"><summary>Visites et mesures<span id="nbMesures"></span></summary>
+        <div id="mesures" style="margin-top:6px"><p class="gris">Chargement…</p></div></details>
         <details class="section-fiche" open><summary>Carnet de chantier</summary>
         <div id="carnet" style="margin-top:6px"><p class="gris">Chargement du carnet…</p></div></details>
-        <details class="section-fiche"><summary>Mesures<span id="nbMesures"></span></summary>
-        <div id="mesures" style="margin-top:6px"><p class="gris">Chargement…</p></div></details>
         <details class="section-fiche"><summary>Devis et factures<span>${docs.length}</span></summary>
         <div class="liste" style="margin-top:6px">${docs.map(ligneDoc).join("") || '<p class="gris">Aucun devis ni facture.</p>'}</div></details>
         <details class="section-fiche"><summary>Simulations 3D<span>${sims.length}</span></summary>

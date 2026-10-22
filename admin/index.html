@@ -130,6 +130,11 @@
   .murs-mesures input { min-width: 0; }
   .partie-mesure { display: grid; grid-template-columns: 1fr auto 1fr; gap: 6px; align-items: center; margin-top: 6px; }
   .partie-mesure input { min-width: 0; }
+  .titre-mesures { margin-top: 8px; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--gris); font-weight: 600; }
+  .etapes-visite { display: flex; gap: 6px; }
+  .etapes-visite span { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 600; background: var(--pierre); color: var(--gris); }
+  .etapes-visite span.actif { background: var(--encre); color: #fff; }
+  .etapes-visite span.fait { background: #e3f0e8; color: #2f6f4f; }
   .piece-mesures { display: block; font-family: var(--serif); font-weight: 400; font-size: 19px; }
   .liste-mesures div { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; border-top: 1px solid var(--pierre); font-size: 14px; }
   .liste-mesures b { font-weight: 600; white-space: nowrap; }
