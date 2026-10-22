@@ -1,5 +1,7 @@
 // Espace admin KA Rénovation : devis, factures, clients, prestations, simulation 3D.
 import * as db from "./store.js";
+// version des fichiers chargés à la demande : à changer à chaque mise en ligne, pour que le téléphone ne garde pas l'ancienne
+const V = "20261022c";
 import { UNITES } from "./donnees.js";
 import { telechargerPDF, totaux, eur, poserTVA, avecTVA, TAUX_TVA, tauxTxt, avenantDe } from "./pdf.js";
 import { CATEGORIES, etatPaiements } from "./carnet.js";
@@ -702,7 +704,7 @@ async function vueClient(id, params) {
       el.textContent = r?.data?.signe_le ? `✓ Signé le ${new Date(r.data.signe_le).toLocaleDateString("fr-FR")}` : r ? "Commencé, pas encore signé" : "À faire en fin de chantier";
     } catch { /* l'objet du devis reste affiché */ }
   });
-  if (c.id) import("./mesures.js").then(m => m.monterMesures(document.getElementById("mesures"), { db, client: c, toast, esc, erreur, compteur: document.getElementById("nbMesures") })).catch(erreur);
+  if (c.id) import(`./mesures.js?v=${V}`).then(m => m.monterMesures(document.getElementById("mesures"), { db, client: c, toast, esc, erreur, compteur: document.getElementById("nbMesures") })).catch(erreur);
   if (c.id) import("./carnet.js").then(async m => {
     await m.monterCarnet(document.getElementById("carnet"), { db, client: c, P, toast, esc, erreur, envoyerMessage });
     if (params?.get("carnet")) document.getElementById("carnet").closest("details")?.scrollIntoView({ block: "start" });
@@ -849,7 +851,7 @@ function vueReglages() {
 /* =================== 3D =================== */
 async function vue3D(params) {
   vue.innerHTML = '<p class="gris">Chargement du simulateur 3D…</p>';
-  const { monterSimulateur } = await import("./sim3d.js");
+  const { monterSimulateur } = await import(`./sim3d.js?v=${V}`);
   await monterSimulateur(vue, { db, params, toast, esc, choisirClient, nomClient, creerDevis: creerDevisDepuisSimulation });
 }
 
@@ -923,7 +925,7 @@ async function routeur() {
     else if (r === "tuto") vueTuto();
     else if (r === "reglages") vueReglages();
     else if (r === "3d") await vue3D(params);
-    else if (r === "reception") { const { vueReception } = await import("./reception.js"); await vueReception(vue, { db, docId: a, P, toast, esc, erreur, envoyerMessage }); }
+    else if (r === "reception") { const { vueReception } = await import(`./reception.js?v=${V}`); await vueReception(vue, { db, docId: a, P, toast, esc, erreur, envoyerMessage }); }
     else await vueAccueil();
   } catch (e) { erreur(e); }
 }
