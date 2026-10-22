@@ -42,7 +42,14 @@
   nav.menu a:hover { color: var(--encre); }
   .tel-haut { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; font-size: 14px; font-weight: 600; background: var(--encre); color: #fff; padding: 9px 16px; border-radius: 999px; }
   .tel-haut svg { width: 16px; height: 16px; }
-  .qui-haut { margin-left: auto; margin-right: 14px; font-size: 13px; font-weight: 600; color: var(--encre); text-decoration: none; border-bottom: 1px solid var(--encre); padding-bottom: 1px; }
+  /* Menu déroulant du téléphone */
+  .menu-tel { position: relative; margin-left: auto; margin-right: 12px; }
+  .menu-tel summary { display: grid; place-items: center; gap: 4px; width: 44px; height: 40px; padding: 0 11px; border: 1px solid rgba(0,0,0,.18); border-radius: 999px; background: #fff; font-size: 0; }
+  .menu-tel summary::after { content: none; }
+  .menu-tel summary span { display: block; width: 20px; height: 2px; background: var(--encre); border-radius: 2px; }
+  .menu-tel nav { position: absolute; right: 0; top: 50px; min-width: 210px; background: #fff; border-radius: 16px; box-shadow: 0 14px 40px rgba(0,0,0,.16); padding: 8px; display: grid; }
+  .menu-tel nav a { padding: 12px 14px; border-radius: 10px; text-decoration: none; color: var(--encre); font-size: 15px; font-weight: 500; }
+  .menu-tel nav a:hover { background: var(--pierre); }
 
   /* Héros */
   .heros { position: relative; min-height: calc(100svh - 66px); display: flex; align-items: flex-end; color: #fff; overflow: hidden; padding: 0; background: #2a2723; }
@@ -188,7 +195,7 @@
     body { padding-bottom: 0; }
     .barre { display: none; }
     nav.menu { display: flex; }
-    .qui-haut { display: none; }
+    .menu-tel { display: none; }
     section { padding: 120px 0; }
     .bloc { padding: 0 32px; }
     .heros { min-height: 680px; }
