@@ -77,21 +77,21 @@
     method: "POST", headers: { apikey: CLE, Authorization: "Bearer " + CLE, "Content-Type": "application/json" }, body: JSON.stringify(corps)
   }).then(r => r.ok ? r.json() : Promise.reject(new Error(r.status)));
 
-  // Magasins proposés au client pour chaque article à acheter.
-  // Affiliation : tant qu'un identifiant est vide, le lien reste un lien normal vers la recherche du magasin.
-  // awin = identifiant éditeur Awin ; mid = identifiant du programme du magasin sur Awin.
-  const AFFIL = { awin: "", mid: { "Leroy Merlin": "", "Castorama": "", "Brico Dépôt": "", "ManoMano": "", "Point.P": "", "Mr.Bricolage": "", "Bricomarché": "" } };
+  // Magasins proposés au client pour chaque article à acheter. Les liens (affiliés ou non) viennent de l'appli,
+  // qui les calcule avec les Réglages au moment de l'envoi ; sinon, simple lien vers la recherche du magasin.
   const MAGASINS = [["Leroy Merlin", q => `https://www.leroymerlin.fr/search?q=${q}`], ["Castorama", q => `https://www.castorama.fr/search?term=${q}`],
     ["Brico Dépôt", q => `https://www.bricodepot.fr/search?search-term=${q}`], ["ManoMano", q => `https://www.manomano.fr/recherche/${q}`],
     ["Point.P", q => `https://www.pointp.fr/search?q=${q}`], ["Mr.Bricolage", q => `https://www.mr-bricolage.fr/catalogsearch/result/?q=${q}`],
     ["Bricomarché", q => `https://www.bricomarche.com/search?q=${q}`]];
-  const affilie = nom => !!(AFFIL.awin && AFFIL.mid[nom]);
-  const lien = (nom, url) => affilie(nom)
-    ? `https://www.awin1.com/cread.php?awinmid=${AFFIL.mid[nom]}&awinaffid=${AFFIL.awin}&ued=${encodeURIComponent(url)}` : url;
-  function magasins(terme) {
-    const t = encodeURIComponent(terme.replace(/×/g, "x").replace(/[()]/g, "").replace(/ +/g, " ").trim());
-    return `<div class="magasins">${MAGASINS.map(([nom, url]) =>
-      `<a href="${esc(lien(nom, url(t)))}" target="_blank" rel="${affilie(nom) ? "sponsored " : ""}noopener">${esc(nom)}</a>`).join("")}</div>`;
+  function magasins(a) {
+    let liens = Array.isArray(a.liens) ? a.liens.filter(l => Array.isArray(l) && /^https:\/\//.test(l[1])) : [];
+    if (!liens.length) {
+      const v = /^Voir le détail/.test(a.valeur || "") ? "" : (a.valeur || "");
+      const t = encodeURIComponent(`${a.titre} ${v}`.replace(/×/g, "x").replace(/[()]/g, "").replace(/ +/g, " ").trim());
+      liens = MAGASINS.map(([nom, url]) => [nom, url(t), 0]);
+    }
+    return `<div class="magasins">${liens.map(([nom, url, aff]) =>
+      `<a href="${esc(url)}" target="_blank" rel="${aff ? "sponsored " : ""}noopener">${esc(nom)}</a>`).join("")}</div>`;
   }
 
   let s;
@@ -105,7 +105,7 @@
         ${choix.map(c => `<div class="choix">${c.couleur ? `<i style="background:${esc(c.couleur)}"></i>` : ""}<div><small>${esc(c.titre)}</small>${esc(c.valeur)}</div></div>`).join("")}
       </div>
       ${achats.length ? `<div class="carte"><h2>Ce que vous achetez</h2>
-        ${achats.map(a => `<div class="ligne"><div>${esc(a.titre)}<small>${esc(a.valeur)}${a.detail ? " · " + esc(a.detail) : ""}</small>${magasins(`${a.titre} ${a.valeur || ""}`)}</div>${a.quantite ? `<div class="m">${esc(a.quantite)}</div>` : ""}</div>`).join("")}
+        ${achats.map(a => `<div class="ligne"><div>${esc(a.titre)}<small>${esc(a.valeur)}${a.detail ? " · " + esc(a.detail) : ""}</small>${magasins(a)}</div>${a.quantite ? `<div class="m">${esc(a.quantite)}</div>` : ""}</div>`).join("")}
         <p class="gris" style="font-size:13px;margin-top:10px">Colles, joints, produits d'étanchéité et de pose : fournis par KA Rénovation.</p></div>` : ""}
       ${zoneValidation()}`;
     const f = document.getElementById("valider");

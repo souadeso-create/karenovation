@@ -595,6 +595,21 @@ const MAGASINS = [["Leroy Merlin", q => `https://www.leroymerlin.fr/search?q=${q
   ["Brico Dépôt", q => `https://www.bricodepot.fr/search?search-term=${q}`], ["ManoMano", q => `https://www.manomano.fr/recherche/${q}`],
   ["Point.P", q => `https://www.pointp.fr/search?q=${q}`], ["Mr.Bricolage", q => `https://www.mr-bricolage.fr/catalogsearch/result/?q=${q}`],
   ["Bricomarché", q => `https://www.bricomarche.com/search?q=${q}`]];
+// Liens du client : la recherche de chaque magasin, passée par le lien d'affiliation des Réglages s'il y en a un
+const CLES_AFFIL = { "Leroy Merlin": "affil_leroy", "Castorama": "affil_casto", "Brico Dépôt": "affil_brico", "ManoMano": "affil_mano",
+  "Point.P": "affil_pointp", "Mr.Bricolage": "affil_mrbrico", "Bricomarché": "affil_bricomarche" };
+function termeAchat(a) {
+  const v = /^Voir le détail/.test(a.valeur || "") ? "" : (a.valeur || "");
+  return `${a.titre} ${v}`.replace(/×/g, "x").replace(/[()]/g, "").replace(/ +/g, " ").trim();
+}
+function liensClient(a, P) {
+  const t = encodeURIComponent(termeAchat(a));
+  return MAGASINS.map(([nom, url]) => {
+    const brut = url(t), modele = String(P[CLES_AFFIL[nom]] || "").trim();
+    if (!modele) return [nom, brut, 0];
+    return [nom, modele.includes("{url}") ? modele.replace("{url}", encodeURIComponent(brut)) : modele + encodeURIComponent(brut), 1];
+  });
+}
 // Recherches déjà ouvertes, gardées sur le téléphone : on voit où l'on en est en revenant dans l'appli
 const CLE_VUS = "ka_magasins_vus";
 const vus = (() => { try { return new Set(JSON.parse(localStorage.getItem(CLE_VUS) || "[]")); } catch { return new Set(); } })();
@@ -1733,6 +1748,8 @@ export async function monterSimulateur(vue, { db, params, toast, esc, choisirCli
     try {
       if (!client && !confirm("Aucun client n'est associé à cette simulation. Continuer quand même ?")) return;
       etat.choix = choixClient(); etat.achats = achatsClient();
+      const P = await db.parametres().catch(() => ({}));
+      etat.achats.forEach(a => { a.liens = liensClient(a, P || {}); });
       const s = await enregistrer({ valide_le: null, valide_nom: null, ...(simId && validation.jeton ? {} : { jeton: crypto.randomUUID() }) });
       const lien = lienChoix(s.jeton);
       const texte = `Bonjour,

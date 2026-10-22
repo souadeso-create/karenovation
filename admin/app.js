@@ -815,6 +815,9 @@ const CHAMPS_P = [
   ["Numérotation", [["prochain_devis", "Prochain n° de devis", "number"], ["prochain_facture", "Prochain n° de facture", "number"]]],
   ["Chantiers", [["taux_horaire", "Coût d'une heure de travail (€)", "number"], ["lien_avis", "Lien pour laisser un avis Google"]]]
 ];
+// Modèles de liens d'affiliation, un par magasin (clé du réglage, nom affiché)
+const MAGASINS_AFFIL = [["affil_leroy", "Leroy Merlin"], ["affil_casto", "Castorama"], ["affil_brico", "Brico Dépôt"], ["affil_mano", "ManoMano"],
+  ["affil_pointp", "Point.P"], ["affil_mrbrico", "Mr.Bricolage"], ["affil_bricomarche", "Bricomarché"]];
 function vueReglages() {
   vue.innerHTML = `
     <div class="entete"><h1>Réglages</h1></div>
@@ -824,6 +827,10 @@ function vueReglages() {
         <div class="champ"><label>Vos devis et factures</label><select name="regime_tva"><option value="tva" ${P.regime_tva !== "franchise" ? "selected" : ""}>Avec TVA (société, SASU…)</option><option value="franchise" ${P.regime_tva === "franchise" ? "selected" : ""}>Sans TVA (franchise, art. 293 B)</option></select></div>
         <div class="champ"><label>Mention TVA à taux réduit (attestation du client, sur le devis signé)</label><textarea name="mention_attestation" rows="5">${esc(P.mention_attestation)}</textarea></div>
         <div class="champ"><label>Mention si sans TVA</label><input type="text" name="mention_tva" value="${esc(P.mention_tva)}"></div>
+      </fieldset>
+      <fieldset><legend>Liens d'affiliation</legend>
+        <p class="gris" style="font-size:13px;margin-bottom:10px">Pour la page que reçoit le client quand il valide son projet. Collez le lien donné par la plateforme d'affiliation, en écrivant <b>{url}</b> à la place de l'adresse du produit. Exemple Awin : https://www.awin1.com/cread.php?awinmid=12345&amp;awinaffid=67890&amp;ued={url}. Laissez vide pour un lien normal.</p>
+        ${MAGASINS_AFFIL.map(([k, nom]) => `<div class="champ"><label>${nom}</label><input type="text" name="${k}" value="${esc(P[k])}" placeholder="Lien normal" autocomplete="off" spellcheck="false"></div>`).join("")}
       </fieldset>
       <fieldset><legend>Textes des documents</legend>
         <div class="champ"><label>Conditions générales (devis)</label><textarea name="conditions" rows="8">${esc(P.conditions)}</textarea></div>
