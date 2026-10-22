@@ -74,7 +74,7 @@ export async function monterCarnet(el, { db, client, P = {}, toast, esc, erreur,
   const caches = new Set(); // entrées retirées, en attente de suppression (on peut annuler)
 
   const charger = async () => {
-    try { lignes = await db.listerCarnet(client.id); urls = await db.urlsCarnet(lignes); }
+    try { lignes = (await db.listerCarnet(client.id)).filter(l => l.type !== "mesures"); urls = await db.urlsCarnet(lignes); } // les mesures ont leur propre rubrique
     catch (e) { el.innerHTML = '<p class="gris">Le carnet n\'est pas encore activé.</p>'; return false; }
     lignes.forEach(l => { if (!l.type || (l.type === "note" && (l.chemin || l.image))) l.type = estPhoto(l) ? "photo" : "note"; });
     return true;

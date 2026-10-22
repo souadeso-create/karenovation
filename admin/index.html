@@ -123,6 +123,18 @@
   .pointage small { display: block; color: var(--gris); font-size: 13px; }
   .pointage.actif { background: #e3f0e8; border-color: #b9d6c4; }
   .note-carnet.heures p b { font-family: var(--serif); font-weight: 400; font-size: 18px; }
+  .note-carnet.mesures { border-left: 3px solid var(--encre); }
+  .note-carnet.mesures p b { font-family: var(--serif); font-weight: 400; font-size: 18px; }
+  .liste-mesures { margin-top: 6px; }
+  .murs-mesures { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 6px; }
+  .murs-mesures input { min-width: 0; }
+  .partie-mesure { display: grid; grid-template-columns: 1fr auto 1fr; gap: 6px; align-items: center; margin-top: 6px; }
+  .partie-mesure input { min-width: 0; }
+  .piece-mesures { display: block; font-family: var(--serif); font-weight: 400; font-size: 19px; }
+  .liste-mesures div { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; border-top: 1px solid var(--pierre); font-size: 14px; }
+  .liste-mesures b { font-weight: 600; white-space: nowrap; }
+  .ligne-mesure { display: grid; grid-template-columns: 1fr 1fr 36px; gap: 6px; margin-bottom: 6px; align-items: center; }
+  .ligne-mesure input { min-width: 0; }
   @media (min-width: 700px) { .resume-carnet { grid-template-columns: repeat(4, 1fr) !important; } }
   .resume-carnet { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 10px; }
   .resume-carnet button { background: #fff; border: 1px solid var(--sable); border-radius: 12px; padding: 10px; text-align: left; font: inherit; font-size: 12px; color: var(--gris); cursor: pointer; }
