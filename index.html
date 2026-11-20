@@ -11,12 +11,12 @@
 <meta property="og:description" content="KA Rénovation, artisan salle de bain dans les Yvelines (78) et en Île-de-France : rénovation clé en main, douche à l'italienne, carreleur, plombier. Devis gratuit.">
 <meta property="og:image" content="https://karenovation.fr/medias/bleu-ensemble.jpg">
 <meta property="og:url" content="https://karenovation.fr/">
-<meta name="theme-color" content="#fcfbf9">
+<meta name="theme-color" content="#fafbfc">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -35,9 +35,9 @@
 </script>
 <style>
   :root {
-    --fond: #fcfbf9; --pierre: #f4f0ea; --sable: #e6dfd5; --encre: #1b1a18; --gris: #6d675f; --clair: #a39b90;
+    --fond: #fafbfc; --pierre: #f0f2f5; --sable: #dde2e8; --encre: #1b1a18; --gris: #6d675f; --clair: #a39b90;
     --sombre: #141312; --filet: #c8141a; --blanc: #fff;
-    --serif: Lato, Arial, sans-serif; --sans: Lato, Arial, sans-serif;
+    --serif: Oswald, "Arial Narrow", Arial, sans-serif; --sans: Archivo, Arial, sans-serif;
     --ombre: 0 2px 4px rgba(0, 0, 0, .08);
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -49,11 +49,12 @@
   section { padding: 80px 0; }
 
   /* Titres : une partie en gras, un court filet dessous */
-  h1, h2, h3 { font-family: var(--sans); font-weight: 400; line-height: 1.25; text-wrap: balance; }
+  h1, h2, h3, .gros-tel, .note b, .prix .montant, .presta .num, .etape .num, .carte-conseil b { font-family: var(--serif); letter-spacing: .01em; }
+  h1, h2, h3 { font-weight: 400; line-height: 1.25; text-wrap: balance; }
   h2 { font-size: clamp(26px, 6.6vw, 32px); }
-  h2 i { font-style: normal; font-weight: 700; color: var(--gris); }
+  h2 i { font-style: normal; font-weight: 600; color: var(--gris); }
   h2::after { content: ""; display: block; width: 30px; height: 2px; border-radius: 2px; background: var(--filet); margin: 16px 0 0; }
-  h3 { font-weight: 700; }
+  h3 { font-weight: 600; }
   .label { display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: .3em; text-transform: uppercase; color: var(--gris); margin-bottom: 12px; }
   .intro { color: var(--gris); max-width: 600px; margin-top: 20px; }
 
@@ -322,7 +323,7 @@
   .carte-conseil:hover { border-color: var(--clair); box-shadow: 0 6px 18px rgba(0, 0, 0, .1); transform: translateY(-2px); }
   .carte-conseil img { width: 110px; height: 100%; min-height: 110px; object-fit: cover; }
   .carte-conseil span { padding: 14px 14px 14px 0; font-size: 14.4px; color: var(--gris); }
-  .carte-conseil b { text-wrap: pretty; display: block; font-family: var(--sans); font-weight: 700; font-size: 17.6px; line-height: 1.3; color: var(--encre); margin-bottom: 4px; }
+  .carte-conseil b { text-wrap: pretty; display: block; font-weight: 600; font-size: 17.6px; line-height: 1.3; color: var(--encre); margin-bottom: 4px; }
 
   @media (prefers-reduced-motion: reduce) {
     .apparait { opacity: 1; transform: none; }
@@ -412,8 +413,8 @@
   <video autoplay muted loop playsinline preload="auto" poster="medias/bleu-ensemble.jpg" aria-hidden="true"><source src="medias/video-bleu.mp4" type="video/mp4"></video>
   <div class="bloc">
     <span class="label">Salles de bain · Île-de-France</span>
-    <h1>Votre salle de bain, refaite <i>du sol au plafond.</i></h1>
-    <p>Douche à l'italienne, plomberie, étanchéité, carrelage, placo et électricité : votre artisan s'occupe de tout, de la démolition à la dernière finition.</p>
+    <h1>Votre spécialiste <i>salle de bain</i></h1>
+    <p>Douche à l'italienne, plomberie, étanchéité, carrelage, placo et électricité.</p>
     <div class="actions">
       <a class="btn btn-clair" href="#contact">Prendre rendez-vous</a>
       <a class="btn btn-contour" href="#realisations">Nos réalisations</a>
@@ -429,8 +430,8 @@
   <div class="bloc">
     <div class="aa-grille">
       <div class="comparateur apparait" id="comparateur">
-        <img src="medias/pierre-avant.jpg" alt="Salle de bain avant les travaux, murs bruts et gravats">
-        <img class="apres" src="medias/pierre-apres.jpg" alt="La même salle de bain après rénovation : mur effet pierre, vasque noire, meubles bois">
+        <img src="medias/bleu-avant.jpg" alt="Ancienne salle de bain avec baignoire, pendant la dépose">
+        <img class="apres" src="medias/bleu-ensemble.jpg" alt="Salle de bain bleu-vert avec douche vitrée et miroirs lumineux">
         <span class="tag g">Avant</span><span class="tag d">Après</span>
         <div class="ligne"></div>
         <div class="poignee" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m9 6-6 6 6 6M15 6l6 6-6 6"/></svg></div>
@@ -440,8 +441,8 @@
     <div class="duos">
       <article class="duo apparait">
         <div class="images">
-          <figure><img src="medias/bleu-avant.jpg" alt="Ancienne salle de bain avec baignoire, pendant la dépose" loading="lazy"><figcaption>Avant</figcaption></figure>
-          <figure><img src="medias/bleu-ensemble.jpg" alt="Salle de bain bleu-vert avec douche vitrée et miroirs lumineux" loading="lazy"><figcaption>Après</figcaption></figure>
+          <figure><img src="medias/pierre-avant.jpg" alt="Salle de bain avant les travaux, murs bruts et gravats" loading="lazy"><figcaption>Avant</figcaption></figure>
+          <figure><img src="medias/pierre-apres.jpg" alt="La même salle de bain après rénovation : mur effet pierre, vasque noire, meubles bois" loading="lazy"><figcaption>Après</figcaption></figure>
         </div>
       </article>
       <article class="duo apparait">
